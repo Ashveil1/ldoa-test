@@ -22,7 +22,7 @@ APKPATH=$(adb shell pm path moe.shizuku.privileged.api | head -1 | sed 's/^packa
 echo "shizuku apk: $APKPATH"
 STARTER="$(dirname "$APKPATH")/lib/x86_64/libshizuku.so"
 adb shell ls -la "$STARTER"
-adb shell "nohup $STARTER > /sdcard/shizuku.log 2>&1 &"
+adb shell "nohup $STARTER --apk=$APKPATH > /sdcard/shizuku.log 2>&1 &"
 sleep 10
 adb shell cat /sdcard/shizuku.log || true
 adb shell ps -A | grep -i shizuku || true
@@ -46,16 +46,28 @@ done
 # Let the service bind, the display be created and Settings draw.
 sleep 20
 
+# PNG for the artifact + raw RGBA for the assert (ubuntu-24.04 runners
+# have no ImageMagick; raw screencap needs no decoder).
 adb exec-out screencap -p > vd-m1.png
-ls -la vd-m1.png
-MEAN=$(identify -format "%[mean]" vd-m1.png)
-echo "screenshot mean pixel value: $MEAN"
-# An all-black frame has mean ~0; a rendered Settings window is far
-# above. 500/65535 (~0.8% white) still counts a mostly-dark frame with
-# real content as non-black.
-python3 - "$MEAN" <<'PY'
-import sys
-mean = float(sys.argv[1])
-print("PASS: non-black frame" if mean > 500 else "FAIL: frame is black", "mean =", mean)
-sys.exit(0 if mean > 500 else 1)
+adb exec-out screencap > vd-m1.raw
+ls -la vd-m1.png vd-m1.raw
+python3 - <<'PY'
+import struct, sys
+d = open('vd-m1.raw','rb').read()
+w, h, fmt = struct.unpack('<III', d[:12])
+px = d[12:]
+n = len(px) // 4
+total = 0
+nonblack = 0
+for i in range(0, n * 4, 4):
+    v = px[i] + px[i+1] + px[i+2]
+    total += v
+    if v > 30:
+        nonblack += 1
+mean = total / (n * 3)
+frac = nonblack / n
+print(f"frame {w}x{h} fmt={fmt} mean={mean:.1f} nonblack={frac*100:.1f}%")
+ok = frac > 0.01
+print("PASS: non-black frame" if ok else "FAIL: frame is black")
+sys.exit(0 if ok else 1)
 PY
