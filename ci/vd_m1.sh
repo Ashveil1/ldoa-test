@@ -14,24 +14,18 @@ adb wait-for-device
 adb install -r app/build/outputs/apk/vd/debug/app-vd-debug.apk
 adb install -r shizuku.apk
 
-# The Shizuku app extracts its starter (start.sh + binary) on first
-# launch; the file does not exist before that. Launch, then poll for it.
-adb shell monkey -p moe.shizuku.privileged.api -c android.intent.category.LAUNCHER 1
-FOUND=0
-for i in $(seq 1 15); do
-  if adb shell ls /sdcard/Android/data/moe.shizuku.privileged.api/start.sh; then
-    FOUND=1
-    break
-  fi
-  sleep 2
-done
-echo "start.sh present: $FOUND"
-
-# Start the Shizuku server as root (adb root on the emulator - the same
-# start.sh users run through wireless adb on device).
-adb shell 'nohup sh /sdcard/Android/data/moe.shizuku.privileged.api/start.sh > /sdcard/shizuku.log 2>&1 &'
+# Shizuku v13.6's starter is the packaged native binary libshizuku.so
+# in the app's extracted native lib dir - the app's "Start (in adb)"
+# command runs it directly. No app launch or start.sh needed. Derive
+# the path from pm path so it works regardless of install hash.
+APKPATH=$(adb shell pm path moe.shizuku.privileged.api | head -1 | sed 's/^package://' | tr -d '\r')
+echo "shizuku apk: $APKPATH"
+STARTER="$(dirname "$APKPATH")/lib/x86_64/libshizuku.so"
+adb shell ls -la "$STARTER"
+adb shell "nohup $STARTER > /sdcard/shizuku.log 2>&1 &"
 sleep 10
 adb shell cat /sdcard/shizuku.log || true
+adb shell ps -A | grep -i shizuku || true
 
 adb shell am start -n com.aistudio.aetherlinux.pxkdmv.vd/com.example.vd.VdSmokeActivity
 sleep 12
