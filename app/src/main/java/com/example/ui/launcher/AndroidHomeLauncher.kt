@@ -104,7 +104,8 @@ fun AndroidHomeLauncher(
         HomeScreenAppEntry("YouTube", "com.google.android.youtube"),
         HomeScreenAppEntry("Maps", "com.google.android.apps.maps"),
         HomeScreenAppEntry("Keep Notes", "com.google.android.keep"),
-        HomeScreenAppEntry("GPU Hardware", "gpu", true, LinuxAppDefinition("gpu", "GPU Hardware", "Hardware", "", "virgl", "speed"))
+        HomeScreenAppEntry("GPU Hardware", "gpu", true, LinuxAppDefinition("gpu", "GPU Hardware", "Hardware", "", "virgl", "speed")),
+        HomeScreenAppEntry("Ubuntu Desktop", "linux-desktop", true, LinuxAppDefinition("linux-desktop", "Ubuntu Desktop (real)", "System", "", "gnome-session", "desktop_windows"))
     )
 
     BoxWithConstraints(
@@ -169,39 +170,25 @@ fun AndroidHomeLauncher(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            // Real Stock Android Status Bar
-            Row(
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Clean AOSP/iOS-style clock + date
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .clickable { viewModel.setAppDrawerOpen(true) },
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
                     text = timeFormat.format(now),
                     color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontSize = 56.sp,
+                    fontWeight = FontWeight.Light
                 )
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(Icons.Default.Wifi, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
-                    Text("5G", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Icon(Icons.Default.BatteryFull, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                    Text("${telemetry.batteryPercent}%", color = Color.White, fontSize = 12.sp)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Real Pixel "At a Glance" Widget (Tappable + settings button)
-            if (customization.showAtAGlanceWidget) {
-                PixelAtAGlanceWidget(
-                    onClick = { viewModel.setAppDrawerOpen(true) },
-                    onCustomizeClick = { viewModel.setCustomizationOpen(true) }
+                Text(
+                    text = SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(now),
+                    color = Color(0xCCFFFFFF),
+                    fontSize = 14.sp
                 )
             }
 
@@ -228,7 +215,7 @@ fun AndroidHomeLauncher(
                                     if (customization.openAppsInFloatingWindow) {
                                         viewModel.openAndroidAppInWindow(app.keyOrPackage, app.name)
                                     } else {
-                                        viewModel.appsManager.launchApp(app.keyOrPackage)
+                                        viewModel.appsManager.launchAppFreeform(app.keyOrPackage)
                                     }
                                 }
                             }
@@ -293,48 +280,19 @@ fun AndroidHomeLauncher(
                 }
             }
 
-            // Real Pixel Google Search Bar (Functional search input + web query + voice + lens)
-            if (customization.showSearchBar) {
-                RealPixelGoogleSearchBar(
-                    customization = customization,
-                    onVoiceClick = {
-                        viewModel.openLinuxApp(LinuxAppDefinition("terminal", "Terminal (Linux)", "System", "", "bash", "terminal"))
-                    },
-                    onLensClick = {
-                        viewModel.openAndroidAppInWindow("com.android.camera2", "Camera")
-                    },
-                    onSearchSubmit = { query ->
-                        // Also open app drawer and filter if matching installed app
-                        viewModel.setAppDrawerOpen(true)
-                    },
-                    onOpenCustomize = {
-                        viewModel.setCustomizationOpen(true)
-                    }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Swipe Up Visual Hint Handle (Pixel / AOSP style pill arrow)
+            // Slim swipe-up handle (all apps)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { viewModel.setAppDrawerOpen(true) }
-                    .padding(vertical = 2.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(vertical = 6.dp),
+                horizontalArrangement = Arrangement.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.KeyboardArrowUp,
-                    contentDescription = "Swipe up for all apps",
+                    contentDescription = "All apps",
                     tint = Color(0xAAFFFFFF),
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Swipe up for all apps",
-                    color = Color(0xAAFFFFFF),
-                    fontSize = 11.sp
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
@@ -344,7 +302,9 @@ fun AndroidHomeLauncher(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Color(0x66000000))
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -353,7 +313,7 @@ fun AndroidHomeLauncher(
                     keyOrPackage = "phone",
                     realBitmap = viewModel.appsManager.getAppIcon("com.google.android.dialer"),
                     size = 52.dp,
-                    onClick = { viewModel.appsManager.launchApp("com.google.android.dialer") }
+                    onClick = { viewModel.appsManager.launchAppFreeform("com.google.android.dialer") }
                 )
 
                 // 2. Messages
@@ -361,7 +321,7 @@ fun AndroidHomeLauncher(
                     keyOrPackage = "messages",
                     realBitmap = viewModel.appsManager.getAppIcon("com.google.android.apps.messaging"),
                     size = 52.dp,
-                    onClick = { viewModel.appsManager.launchApp("com.google.android.apps.messaging") }
+                    onClick = { viewModel.appsManager.launchAppFreeform("com.google.android.apps.messaging") }
                 )
 
                 // 3. Center: Real Ubuntu Terminal (Floating window)
@@ -378,7 +338,7 @@ fun AndroidHomeLauncher(
                     keyOrPackage = "chrome",
                     realBitmap = viewModel.appsManager.getAppIcon("com.android.chrome"),
                     size = 52.dp,
-                    onClick = { viewModel.appsManager.launchApp("com.android.chrome") }
+                    onClick = { viewModel.appsManager.launchAppFreeform("com.android.chrome") }
                 )
 
                 // 5. Camera
@@ -386,7 +346,7 @@ fun AndroidHomeLauncher(
                     keyOrPackage = "camera",
                     realBitmap = viewModel.appsManager.getAppIcon("com.android.camera2"),
                     size = 52.dp,
-                    onClick = { viewModel.appsManager.launchApp("com.android.camera2") }
+                    onClick = { viewModel.appsManager.launchAppFreeform("com.android.camera2") }
                 )
             }
         }
