@@ -27,18 +27,14 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      # The debug signingConfig points at ${rootDir}/debug.keystore, which
-      # .gitignore excludes by design (AI Studio generates it locally).
-      # CI generates an ephemeral one per run; nothing secret here.
+      # debug.keystore is committed on purpose: a FIXED debug signing key so
+      # every CI APK is an upgrade-compatible install over the previous one.
       # :lorie builds libXlorie.so from C source; bison generates the xkb
       # parser, the SDK cmake package provides ninja.
       - name: Install native build tools
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq bison
           sdkmanager 'ndk;29.0.14206865' 'cmake;3.22.1'
-
-      - name: Generate ephemeral debug keystore
-        run: keytool -genkeypair -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
 
       - name: Unit tests
         run: gradle testDebugUnitTest --stacktrace
