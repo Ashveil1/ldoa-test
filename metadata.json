@@ -1,0 +1,8 @@
+{
+  "name": "AetherLinux",
+  "description": "Hybrid Ubuntu Linux Desktop and Android Home Launcher with GPU acceleration, floating windows, external monitor support, and smart file sync.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
