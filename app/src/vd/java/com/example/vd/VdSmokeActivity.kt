@@ -1,9 +1,6 @@
 package com.example.vd
 
-import android.content.pm.PackageManager
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,40 +17,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import rikka.shizuku.Shizuku
 
 /**
  * M1 dev entry (no launcher icon; started by the emulator workflow via
  * `am start`): one VdPanel running com.android.settings through the
  * Shizuku path, with the backend state printed above it and logged to
  * logcat tag VdSmoke. The workflow asserts state=READY in logcat and a
- * non-black screencap.
- *
- * ShizukuVdBackend.start() is single-shot: a permission grant or a
- * late-starting server is never retried, so this harness re-drives
- * start() on the permission result and while the binder is missing.
+ * non-black screencap. The backend owns the Shizuku lifecycle
+ * (binder/permission/death listeners re-drive it), so this activity
+ * only starts and stops it.
  */
 class VdSmokeActivity : ComponentActivity() {
 
     private val stateText = mutableStateOf("starting")
     private lateinit var backend: ShizukuVdBackend
-    private val handler = Handler(Looper.getMainLooper())
-
-    private val permListener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
-        Log.i("VdSmoke", "permission result=$grantResult")
-        if (grantResult == PackageManager.PERMISSION_GRANTED) backend.start()
-    }
-
-    private val retry = object : Runnable {
-        override fun run() {
-            val s = stateText.value
-            if (s == ShizukuVdBackend.State.NOT_RUNNING.name) {
-                Log.i("VdSmoke", "retrying start() - binder was missing")
-                backend.start()
-            }
-            if (s != ShizukuVdBackend.State.READY.name) handler.postDelayed(this, 3000)
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,14 +56,11 @@ class VdSmokeActivity : ComponentActivity() {
                 }
             }
         }
-        Shizuku.addRequestPermissionResultListener(permListener)
         backend.start()
-        handler.postDelayed(retry, 3000)
     }
 
     override fun onDestroy() {
-        Shizuku.removeRequestPermissionResultListener(permListener)
-        handler.removeCallbacks(retry)
+        backend.stop()
         super.onDestroy()
     }
 }

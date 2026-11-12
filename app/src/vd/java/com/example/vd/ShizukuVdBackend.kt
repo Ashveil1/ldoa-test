@@ -27,15 +27,47 @@ class ShizukuVdBackend(private val ctx: Context, private val onState: (State) ->
         .daemon(false).processNameSuffix("vd").version(1)
 
     private val conn = object : android.content.ServiceConnection {
-        override fun onServiceConnected(n: ComponentName, b: IBinder) { remote = IVdService.Stub.asInterface(b); onState(State.READY) }
-        override fun onServiceDisconnected(n: ComponentName) { remote = null; onState(State.DIED) }
+        override fun onServiceConnected(n: ComponentName, b: IBinder) { binding = false; remote = IVdService.Stub.asInterface(b); onState(State.READY) }
+        override fun onServiceDisconnected(n: ComponentName) { binding = false; remote = null; onState(State.DIED) }
     }
 
+    private var started = false
+    private var binding = false
+
+    private val binderListener = Shizuku.OnBinderReceivedListener { drive() }
+    private val deadListener = Shizuku.OnBinderDeadListener { remote = null; binding = false; onState(State.NOT_RUNNING) }
+    private val permListener = Shizuku.OnRequestPermissionResultListener { _, result ->
+        if (result == android.content.pm.PackageManager.PERMISSION_GRANTED) drive() else onState(State.NEED_PERMISSION)
+    }
+
+    /** Call once (e.g. from the panel's first composition). Safe to call again; call stop() when the screen goes away. */
     fun start() {
+        if (started) { drive(); return }
+        started = true
+        Shizuku.addBinderReceivedListenerSticky(binderListener)
+        Shizuku.addBinderDeadListener(deadListener)
+        Shizuku.addRequestPermissionResultListener(permListener)
+        drive()
+    }
+
+    fun stop() {
+        if (!started) return
+        started = false
+        Shizuku.removeBinderReceivedListener(binderListener)
+        Shizuku.removeBinderDeadListener(deadListener)
+        Shizuku.removeRequestPermissionResultListener(permListener)
+        if (remote != null) runCatching { Shizuku.unbindUserService(args, conn, true) }
+        remote = null; binding = false
+    }
+
+    private fun drive() {
+        if (remote != null || binding) return
         if (!Shizuku.pingBinder()) { onState(State.NOT_RUNNING); return }
+        if (Shizuku.shouldShowRequestPermissionRationale()) { onState(State.NEED_PERMISSION); return } // user chose "deny, don't ask again"
         if (Shizuku.checkSelfPermission() != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             onState(State.NEED_PERMISSION); Shizuku.requestPermission(1); return
         }
+        binding = true
         onState(State.CONNECTING)
         Shizuku.bindUserService(args, conn)
     }
