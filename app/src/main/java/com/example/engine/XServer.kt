@@ -60,21 +60,7 @@ object XServer {
         thread(name = "xserver-start") {
             try {
                 start(app)
-                val installer = DistroInstaller(app)
-                if (installer.isInstalled(distro)) {
-                    val rootfs = installer.rootfsDir(distro)
-                    if (!GuestUbuntu.hasGnome(rootfs)) {
-                        Log.i(TAG, "GNOME not provisioned; apt install gnome-shell et al")
-                        val add = GuestUbuntu.provisionGnome(app, rootfs)
-                        Log.i(TAG, "gnome provision exit=" + add.exitCode)
-                    }
-                    if (GuestUbuntu.hasGnome(rootfs)) {
-                        Log.i(TAG, "launching GNOME session")
-                        GuestUbuntu.launchGnomeSession(app, rootfs)
-                    } else {
-                        Log.e(TAG, "GNOME unavailable; desktop will be empty")
-                    }
-                }
+                startGuestGui(app, distro)
             } catch (t: Throwable) {
                 Log.e(TAG, "X server start failed", t)
             }
@@ -85,6 +71,27 @@ object XServer {
         }
     }
 
+    /** The on-device GUI milestone: one real X app (xterm) on the lorie
+     *  display. Deliberately NOT GNOME - its apt set is hundreds of MB and
+     *  its feasibility here is unproven; prove the chain with ~15 MB first.
+     *  Evidence trail: guest-gui-smoke.log. */
+    private fun startGuestGui(ctx: Context, distro: Distro) {
+        val installer = DistroInstaller(ctx)
+        if (!installer.isInstalled(distro)) return
+        val rootfs = installer.rootfsDir(distro)
+        if (!GuestUbuntu.hasXterm(rootfs)) {
+            Log.i(TAG, "xterm not provisioned; apt install xterm x11-apps")
+            val add = GuestUbuntu.provisionGuiSmoke(ctx, rootfs)
+            Log.i(TAG, "gui-smoke provision exit=" + add.exitCode)
+        }
+        if (GuestUbuntu.hasXterm(rootfs)) {
+            Log.i(TAG, "launching xterm GUI smoke")
+            GuestUbuntu.launchXterm(ctx, rootfs)
+        } else {
+            Log.e(TAG, "xterm unavailable; X display will be empty")
+        }
+    }
+
     fun openDesktop(activity: Activity, distro: Distro) {
         if (preparing) return
         preparing = true
@@ -92,27 +99,7 @@ object XServer {
             val ctx = activity.applicationContext
             try {
                 start(ctx)
-                // The desktop entry point must launch the DESKTOP the tests
-                // prove (jwm + pcmanfm + st), not the old xclock smoke -
-                // otherwise the shipped app does less than the CI evidence.
-                val installer = DistroInstaller(ctx)
-                if (installer.isInstalled(distro)) {
-                    val rootfs = installer.rootfsDir(distro)
-                    // Ubuntu-only here (AetherLinux ships one distro). GNOME
-                    // feasibility on the lorie stack is unproven; guest-gnome.log
-                    // is the evidence trail.
-                    if (!GuestUbuntu.hasGnome(rootfs)) {
-                        Log.i(TAG, "GNOME not provisioned; apt install gnome-shell et al")
-                        val add = GuestUbuntu.provisionGnome(ctx, rootfs)
-                        Log.i(TAG, "gnome provision exit=" + add.exitCode)
-                    }
-                    if (GuestUbuntu.hasGnome(rootfs)) {
-                        Log.i(TAG, "launching GNOME session")
-                        GuestUbuntu.launchGnomeSession(ctx, rootfs)
-                    } else {
-                        Log.e(TAG, "GNOME unavailable; desktop will be empty")
-                    }
-                }
+                startGuestGui(ctx, distro)
             } catch (t: Throwable) {
                 Log.e(TAG, "X server start failed", t)
             }

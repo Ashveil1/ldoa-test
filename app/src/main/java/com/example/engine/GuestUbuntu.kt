@@ -152,4 +152,62 @@ object GuestUbuntu {
         Log.i(TAG, "launching GNOME session, log=$log")
         return pb.start()
     }
+
+    // --- Minimal GUI smoke path (the milestone before any desktop session) ---
+    // One real X app rendering on the lorie display proves the whole
+    // server -> proot -> guest chain. GNOME stays out of the default flow
+    // until this is verified on-device: its apt set is hundreds of MB over
+    // a network that has corrupted big downloads before.
+    private val GUI_SMOKE_PACKAGES = listOf("xterm", "x11-apps", "fonts-dejavu-core")
+
+    fun hasXterm(rootfs: File): Boolean = File(rootfs, "usr/bin/xterm").isFile
+
+    /** apt-get update + install the tiny X smoke set (~15 MB, vs GNOME's
+     *  hundreds). One retry on failure, same as provisionGnome. */
+    fun provisionGuiSmoke(ctx: Context, rootfs: File): Proot.Result {
+        var r = apt(ctx, rootfs, "update")
+        if (r.exitCode != 0) {
+            Thread.sleep(5_000)
+            r = apt(ctx, rootfs, "update")
+            if (r.exitCode != 0) return r
+        }
+        r = apt(ctx, rootfs, "install", "-y", "--no-install-recommends", *GUI_SMOKE_PACKAGES.toTypedArray())
+        if (r.exitCode != 0) {
+            Thread.sleep(5_000)
+            r = apt(ctx, rootfs, "install", "-y", "--no-install-recommends", *GUI_SMOKE_PACKAGES.toTypedArray())
+        }
+        Log.i(TAG, "gui-smoke provision exit=" + r.exitCode)
+        return r
+    }
+
+    /** Launch xterm on :0 through proot, fake-root like the session path.
+     *  Evidence trail: guest-gui-smoke.log. */
+    fun launchXterm(ctx: Context, rootfs: File): Process {
+        val nd = ctx.applicationInfo.nativeLibraryDir
+        val log = File(ctx.filesDir, "guest-gui-smoke.log")
+        val pb = ProcessBuilder(
+            File(nd, "libproot.so").absolutePath,
+            "--link2symlink",
+            "-0",
+            "-r", rootfs.absolutePath,
+            "-b", "/dev", "-b", "/proc", "-b", "/sys",
+            "-b", XServer.socketDir(ctx).absolutePath + ":/tmp/.X11-unix",
+            "-w", "/root",
+            "/usr/bin/xterm", "-geometry", "80x24+40+40"
+        )
+        pb.environment().putAll(mapOf(
+            "PROOT_LOADER" to File(nd, "libproot_loader.so").absolutePath,
+            "PROOT_LOADER_32" to File(nd, "libproot_loader32.so").absolutePath,
+            "LD_LIBRARY_PATH" to nd,
+            "HOME" to "/root",
+            "DISPLAY" to ":0",
+            "PATH" to "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "PROOT_TMP_DIR" to Proot.prootTmpDir(ctx).absolutePath,
+            "TMPDIR" to "/tmp"
+        ))
+        pb.redirectErrorStream(true)
+        pb.redirectOutput(ProcessBuilder.Redirect.appendTo(log))
+        Log.i(TAG, "launching xterm GUI smoke, log=$log")
+        return pb.start()
+    }
 }
