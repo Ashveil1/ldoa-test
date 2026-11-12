@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -79,26 +80,36 @@ class PRootUbuntuDistroEngine(private val context: Context) {
             "distro: ${distro.displayName} (ubuntu-base ${distro.id}, pinned + sha256-verified)"
         ))
         if (!installer.isInstalled(distro)) {
-            appendLines(listOf("Installing real Ubuntu userland (~30 MB download)…"))
-            var lastPct = -1
-            val ok = installer.install(distro) { st ->
-                when (st) {
-                    is InstallState.Downloading -> {
-                        val pct = if (st.totalBytes > 0) (st.doneBytes * 100 / st.totalBytes).toInt() else 0
-                        if (pct / 10 != lastPct / 10) {
-                            lastPct = pct
-                            appendLines(listOf("download: $pct% (${st.doneBytes / 1024} / ${st.totalBytes / 1024} KiB)"))
+            // The download keeps its partial file; every attempt resumes with
+            // an HTTP Range request, so a dropped connection costs nothing.
+            var ok = false
+            var attempt = 0
+            while (!ok && attempt < 5) {
+                attempt++
+                if (attempt > 1) {
+                    appendLines(listOf("retrying download (attempt $attempt/5, resuming)…"))
+                    delay(2_000L * attempt)
+                }
+                var lastPct = -1
+                ok = installer.install(distro) { st ->
+                    when (st) {
+                        is InstallState.Downloading -> {
+                            val pct = if (st.totalBytes > 0) (st.doneBytes * 100 / st.totalBytes).toInt() else 0
+                            if (pct / 10 != lastPct / 10) {
+                                lastPct = pct
+                                appendLines(listOf("download: $pct% (${st.doneBytes / 1024} / ${st.totalBytes / 1024} KiB)"))
+                            }
                         }
+                        InstallState.Verifying -> appendLines(listOf("verifying sha256…"))
+                        InstallState.Extracting -> appendLines(listOf("extracting rootfs…"))
+                        InstallState.Installed -> appendLines(listOf("install complete."))
+                        is InstallState.Failed -> appendLines(listOf("install attempt $attempt failed: ${st.message}"))
+                        else -> {}
                     }
-                    InstallState.Verifying -> appendLines(listOf("verifying sha256…"))
-                    InstallState.Extracting -> appendLines(listOf("extracting rootfs…"))
-                    InstallState.Installed -> appendLines(listOf("install complete."))
-                    is InstallState.Failed -> appendLines(listOf("install FAILED: ${st.message}"))
-                    else -> {}
                 }
             }
             if (!ok) {
-                appendLines(listOf("Real guest unavailable. Check network, then restart the app to retry."))
+                appendLines(listOf("Real guest unavailable after 5 attempts. Partial download is kept - type \"retry\" to resume."))
                 return
             }
         }
@@ -156,6 +167,10 @@ class PRootUbuntuDistroEngine(private val context: Context) {
         appendLines(listOf(promptLine() + rawCommand))
         if (cmd == "clear") {
             _terminalOutput.value = emptyList()
+            return
+        }
+        if (cmd == "retry" && !_ready.value) {
+            scope.launch { bootRealGuest() }
             return
         }
         val s = session

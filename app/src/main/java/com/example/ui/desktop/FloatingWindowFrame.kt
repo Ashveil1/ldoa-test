@@ -19,6 +19,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import com.example.engine.InstalledAppsManager
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Close
@@ -293,9 +300,7 @@ fun FloatingWindowFrame(
                         AndroidAppFloatingView(
                             packageName = window.internalAppKey,
                             appName = window.title,
-                            onLaunchNative = {
-                                viewModel.appsManager.launchApp(window.internalAppKey)
-                            }
+                            appsManager = viewModel.appsManager
                         )
                     }
                 }
@@ -351,9 +356,19 @@ fun FloatingWindowFrame(
 fun AndroidAppFloatingView(
     packageName: String,
     appName: String,
-    onLaunchNative: () -> Unit,
+    appsManager: InstalledAppsManager,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val support = remember { appsManager.freeformSupport() }
+    var launchResult by remember { mutableStateOf<InstalledAppsManager.LaunchMode?>(null) }
+    // Auto-launch floating only when the device actually supports freeform;
+    // auto-yanking the user into a fullscreen app would be worse than the panel.
+    LaunchedEffect(packageName) {
+        if (support == InstalledAppsManager.FreeformSupport.SUPPORTED) {
+            launchResult = appsManager.launchAppFreeform(packageName)
+        }
+    }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -395,24 +410,43 @@ fun AndroidAppFloatingView(
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
-                    text = "Android Application Window",
+                    text = "Real Android app - Android windowing",
                     color = YaruTextWhite,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Running inside Ubuntu desktop windowing session. Tap below to launch directly in Android.",
+                    text = when (support) {
+                        InstalledAppsManager.FreeformSupport.SUPPORTED ->
+                            "This device supports floating windows. The app opens floating over the desktop."
+                        InstalledAppsManager.FreeformSupport.DEV_OPTION_NEEDED ->
+                            "Floating windows need a developer option on this device (force activities to be resizable / freeform). Enable it, then relaunch."
+                        InstalledAppsManager.FreeformSupport.UNSUPPORTED ->
+                            "This device does not support floating windows; the app will open fullscreen."
+                    },
                     color = YaruTextMuted,
                     fontSize = 11.sp
                 )
+                launchResult?.let { r ->
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = when (r) {
+                            InstalledAppsManager.LaunchMode.FREEFORM -> "Launched floating."
+                            InstalledAppsManager.LaunchMode.FULLSCREEN_FALLBACK -> "Device ignored floating - opened fullscreen."
+                            InstalledAppsManager.LaunchMode.FAILED -> "Launch failed."
+                        },
+                        color = if (r == InstalledAppsManager.LaunchMode.FREEFORM) Color(0xFF34A853) else Color(0xFFE8A33D),
+                        fontSize = 11.sp
+                    )
+                }
             }
         }
 
         Spacer(modifier = Modifier.weight(1f))
 
         Button(
-            onClick = onLaunchNative,
+            onClick = { launchResult = appsManager.launchAppFreeform(packageName) },
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF34A853)),
             shape = RoundedCornerShape(6.dp),
             modifier = Modifier
@@ -422,7 +456,26 @@ fun AndroidAppFloatingView(
         ) {
             Icon(Icons.Default.Launch, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
             Spacer(modifier = Modifier.width(6.dp))
-            Text("Open in Fullscreen Android", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Text(
+                if (support == InstalledAppsManager.FreeformSupport.UNSUPPORTED) "Open Fullscreen" else "Open Floating",
+                color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold
+            )
+        }
+        if (support == InstalledAppsManager.FreeformSupport.DEV_OPTION_NEEDED) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = {
+                    context.startActivity(
+                        android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF555555)),
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier.fillMaxWidth().height(38.dp)
+            ) {
+                Text("Open Developer Settings", color = Color.White, fontSize = 12.sp)
+            }
         }
     }
 }
