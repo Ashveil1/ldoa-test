@@ -216,7 +216,7 @@ fun AndroidHomeLauncher(
                                     if (customization.openAppsInFloatingWindow) {
                                         viewModel.openAndroidAppInWindow(app.keyOrPackage, app.name)
                                     } else {
-                                        viewModel.appsManager.launchAppFreeform(app.keyOrPackage)
+                                        viewModel.openAndroidAppSmart(app.keyOrPackage, app.name)
                                     }
                                 }
                             }
@@ -315,7 +315,7 @@ fun AndroidHomeLauncher(
                     keyOrPackage = "phone",
                     realBitmap = viewModel.appsManager.getAppIcon("com.google.android.dialer"),
                     size = 52.dp,
-                    onClick = { viewModel.appsManager.launchAppFreeform("com.google.android.dialer") }
+                    onClick = { viewModel.openAndroidAppSmart("com.google.android.dialer", "Phone") }
                 )
 
                 // 2. Messages
@@ -323,7 +323,7 @@ fun AndroidHomeLauncher(
                     keyOrPackage = "messages",
                     realBitmap = viewModel.appsManager.getAppIcon("com.google.android.apps.messaging"),
                     size = 52.dp,
-                    onClick = { viewModel.appsManager.launchAppFreeform("com.google.android.apps.messaging") }
+                    onClick = { viewModel.openAndroidAppSmart("com.google.android.apps.messaging", "Messages") }
                 )
 
                 // 3. Center: Real Ubuntu Terminal (Floating window)
@@ -340,7 +340,7 @@ fun AndroidHomeLauncher(
                     keyOrPackage = "chrome",
                     realBitmap = viewModel.appsManager.getAppIcon("com.android.chrome"),
                     size = 52.dp,
-                    onClick = { viewModel.appsManager.launchAppFreeform("com.android.chrome") }
+                    onClick = { viewModel.openAndroidAppSmart("com.android.chrome", "Chrome") }
                 )
 
                 // 5. Camera
@@ -348,7 +348,7 @@ fun AndroidHomeLauncher(
                     keyOrPackage = "camera",
                     realBitmap = viewModel.appsManager.getAppIcon("com.android.camera2"),
                     size = 52.dp,
-                    onClick = { viewModel.appsManager.launchAppFreeform("com.android.camera2") }
+                    onClick = { viewModel.openAndroidAppSmart("com.android.camera2", "Camera") }
                 )
             }
         }
