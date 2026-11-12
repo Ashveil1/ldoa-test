@@ -27,8 +27,11 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      # debug.keystore is committed on purpose: a FIXED debug signing key so
-      # every CI APK is an upgrade-compatible install over the previous one.
+      # Fixed debug signing key arrives via the ANDROID_DEBUG_KEYSTORE_B64
+      # repo secret (never committed, never in chat) so every CI APK is an
+      # upgrade-compatible install over the previous one.
+      - name: Decode fixed debug keystore
+        run: echo "${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}" | base64 -d > debug.keystore
       # :lorie builds libXlorie.so from C source; bison generates the xkb
       # parser, the SDK cmake package provides ninja.
       - name: Install native build tools

@@ -16,8 +16,8 @@ android {
     applicationId = "com.aistudio.aetherlinux.pxkdmv"
     minSdk = 26
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
+    versionName = "1.0+" + (System.getenv("GITHUB_RUN_NUMBER") ?: "local")
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -35,7 +35,7 @@ android {
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")
       storePassword = "android"
-      keyAlias = "androiddebugkey"
+      keyAlias = "aetherdebug"
       keyPassword = "android"
     }
   }
