@@ -234,14 +234,29 @@ class InstalledAppsManager(private val context: Context) {
         }
     }
 
+    /** Whether the last launch successfully attached the hidden
+     *  windowingMode=5 hint. Surfaced in the panel so on-device behavior
+     *  can be told apart: hint-applied-but-ignored (ROM override) vs
+     *  hint-unavailable (reflection blocked). */
+    var lastWindowingModeHintApplied: Boolean = false
+        private set
+
     fun launchAppFreeform(packageName: String): LaunchMode {
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName) ?: return LaunchMode.FAILED
-        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+        // Match Taskbar's proven-working launch shape exactly: explicit
+        // component + ACTION_MAIN/CATEGORY_LAUNCHER, NEW_TASK|SINGLE_TOP
+        // (no MULTIPLE_TASK). Technique credit: farmerbb/Taskbar (Apache 2.0).
+        val resolved = context.packageManager.getLaunchIntentForPackage(packageName) ?: return LaunchMode.FAILED
+        val component = resolved.component ?: return LaunchMode.FAILED
+        val launchIntent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            setComponent(component)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
         tryEnableFreeformWithSecureSettings()
         val opts = android.app.ActivityOptions.makeBasic()
         opts.launchBounds = freeformBounds()
-        val windowingModeSet = requestFreeformWindowingMode(opts)
-        Log.d(TAG, "freeform launch $packageName: windowingModeSet=$windowingModeSet support=${freeformSupport()} rom=${vendorRom()}")
+        lastWindowingModeHintApplied = requestFreeformWindowingMode(opts)
+        Log.d(TAG, "freeform launch $packageName: windowingModeSet=$lastWindowingModeHintApplied support=${freeformSupport()} rom=${vendorRom()}")
         return try {
             context.startActivity(launchIntent, opts.toBundle())
             if (freeformSupport() == FreeformSupport.SUPPORTED) LaunchMode.FREEFORM else LaunchMode.FULLSCREEN_FALLBACK

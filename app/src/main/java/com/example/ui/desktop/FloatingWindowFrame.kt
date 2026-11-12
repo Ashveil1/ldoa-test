@@ -460,7 +460,7 @@ fun AndroidAppFloatingView(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = when (r) {
-                            InstalledAppsManager.LaunchMode.FREEFORM -> "Floating requested. If it opened fullscreen anyway, this ROM ignored the request (vendor floating is a separate system - see above)."
+                            InstalledAppsManager.LaunchMode.FREEFORM -> if (appsManager.lastWindowingModeHintApplied) "Floating requested (windowing hint applied). If it opened fullscreen anyway, this ROM overrode it - try restarting the phone once." else "Floating requested, but this ROM blocked the windowing hint."
                             InstalledAppsManager.LaunchMode.FULLSCREEN_FALLBACK -> "Device ignored floating - opened fullscreen."
                             InstalledAppsManager.LaunchMode.FAILED -> "Launch failed."
                         },
@@ -487,6 +487,13 @@ fun AndroidAppFloatingView(
             Text(
                 if (support == InstalledAppsManager.FreeformSupport.UNSUPPORTED) "Open Fullscreen" else "Open Floating",
                 color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold
+            )
+        }
+        if (rom != null) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                "On $rom, freeform settings are read at boot: if apps keep opening fullscreen, restart the phone once after enabling floating windows.",
+                color = Color(0xFFAAAAAA), fontSize = 10.sp
             )
         }
         if (support == InstalledAppsManager.FreeformSupport.DEV_OPTION_NEEDED) {
