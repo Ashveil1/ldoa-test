@@ -54,12 +54,18 @@ for i in $(seq 1 20); do
 done
 echo "shizuku grant tapped: $TAPPED"
 
-# Let the service bind, the display be created and Settings draw.
-sleep 25
+# Wait for the VD to actually be created (poll the service log tag).
+for i in $(seq 1 15); do
+  adb logcat -d -s VdPanel:I VdService:I | grep -q 'virtual display created\|display created id=' && break
+  sleep 2
+done
+sleep 8
+adb logcat -d -s VdPanel:I VdService:I VdSmoke:I
+adb shell dumpsys display | grep -iB1 -A3 'virtual' || true
+adb logcat -d > full-logcat.txt || true
 
 # Evidence: state transitions from the smoke activity.
 adb logcat -d -s VdSmoke:I > vd-logcat.txt || true
-cat vd-logcat.txt
 READY=$(grep -c 'state=READY' vd-logcat.txt || true)
 echo "state=READY lines: $READY"
 

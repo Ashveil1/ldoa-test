@@ -4,6 +4,7 @@ import android.content.Context
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.os.SystemClock
+import android.util.Log
 import android.view.InputDevice
 import android.view.InputEvent
 import android.view.MotionEvent
@@ -15,6 +16,7 @@ import org.lsposed.hiddenapibypass.HiddenApiBypass
  * One instance can own many displays (one per panel).
  */
 class VdService {
+    private val TAG = "VdService"
     private val displays = HashMap<Int, VirtualDisplay>()
 
     private fun dm(ctx: Context) = ctx.getSystemService(DisplayManager::class.java)
@@ -28,16 +30,25 @@ class VdService {
             (1 shl 8) /* DESTROY_CONTENT_ON_REMOVAL */
         val vd = dm(ctx).createVirtualDisplay(name, w, h, dpi, surface, flags)
         displays[vd.display.displayId] = vd
+        Log.i(TAG, "virtual display created id=${vd.display.displayId} ${w}x$h dpi=$dpi")
         vd.display.displayId
-    } catch (t: Throwable) { -1 }
+    } catch (t: Throwable) {
+        Log.e(TAG, "createVirtualDisplay failed", t)
+        -1
+    }
 
     fun resize(id: Int, w: Int, h: Int, dpi: Int) { displays[id]?.resize(w, h, dpi) }
 
     fun release(id: Int) { displays.remove(id)?.release() }
 
     /** am start on the target display. Windowing mode 1 = fullscreen inside that display. */
-    fun launch(id: Int, component: String): Int =
-        Runtime.getRuntime().exec(arrayOf("am", "start", "--display", id.toString(), "-n", component)).waitFor()
+    fun launch(id: Int, component: String): Int {
+        val p = Runtime.getRuntime().exec(arrayOf("/system/bin/am", "start", "--display", id.toString(), "-n", component))
+        val out = (p.inputStream.bufferedReader().readText() + p.errorStream.bufferedReader().readText()).trim()
+        val rc = p.waitFor()
+        Log.i(TAG, "launch $component on display $id -> rc=$rc ${out.take(200)}")
+        return rc
+    }
 
     /** Inject touch in display coordinates (already scaled by the panel). */
     fun touch(id: Int, action: Int, x: Float, y: Float, downTime: Long) {

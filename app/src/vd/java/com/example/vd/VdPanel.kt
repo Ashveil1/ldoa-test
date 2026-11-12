@@ -1,26 +1,21 @@
 package com.example.vd
 
 import android.content.Context
+import android.util.Log
 import android.view.MotionEvent
-import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 
-/** Thin handle to the shell-side service (same-process in the emulator dev path, Shizuku UserService binder on device). */
-interface VdBackend {
-    fun createDisplay(name: String, surface: Surface, w: Int, h: Int, dpi: Int): Int
-    fun resize(id: Int, w: Int, h: Int, dpi: Int)
-    fun release(id: Int)
-    fun launch(id: Int, component: String): Int
-    fun touch(id: Int, action: Int, x: Float, y: Float, downTime: Long)
-}
-
 /**
- * One panel = one SurfaceView = one VirtualDisplay. Call from the existing window frame.
- * [component] like "com.android.settings/.Settings".
+ * One panel = one VirtualDisplay rendered into this SurfaceView.
+ *
+ * The backend may not be READY when the surface first appears (Shizuku
+ * bind / permission flow happens in parallel). createDisplay fails soft
+ * with -1 in that state, so surfaceChanged retries once per second
+ * (bounded) instead of silently leaving a permanent black panel.
  */
 @Composable
 fun VdPanel(ctx: Context, backend: VdBackend, component: String, dpi: Int, modifier: Modifier = Modifier) {
@@ -28,13 +23,21 @@ fun VdPanel(ctx: Context, backend: VdBackend, component: String, dpi: Int, modif
         SurfaceView(ctx).also { sv ->
             var id = -1
             var downTime = 0L
+            var retries = 0
             sv.holder.addCallback(object : SurfaceHolder.Callback {
                 override fun surfaceCreated(h: SurfaceHolder) {}
                 override fun surfaceChanged(h: SurfaceHolder, f: Int, w: Int, hh: Int) {
-                    if (id < 0) {
-                        id = backend.createDisplay("vd-panel", h.surface, w, hh, dpi)
-                        if (id >= 0) backend.launch(id, component)
-                    } else backend.resize(id, w, hh, dpi)
+                    if (id >= 0) { backend.resize(id, w, hh, dpi); return }
+                    id = backend.createDisplay("vd-panel", h.surface, w, hh, dpi)
+                    if (id >= 0) {
+                        Log.i("VdPanel", "display created id=$id ${w}x$hh")
+                        backend.launch(id, component)
+                    } else if (retries++ < 30) {
+                        Log.i("VdPanel", "createDisplay not ready, retry $retries")
+                        sv.postDelayed({ surfaceChanged(h, f, w, hh) }, 1000)
+                    } else {
+                        Log.e("VdPanel", "createDisplay gave up after $retries retries")
+                    }
                 }
                 override fun surfaceDestroyed(h: SurfaceHolder) {
                     if (id >= 0) backend.release(id); id = -1

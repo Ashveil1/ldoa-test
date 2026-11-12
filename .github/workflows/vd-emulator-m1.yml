@@ -71,5 +71,7 @@ jobs:
         if: always()
         with:
           name: vd-m1-screenshot
-          path: vd-m1.png
+          path: |
+            vd-m1.png
+            full-logcat.txt
           retention-days: 14
