@@ -52,6 +52,13 @@ jobs:
         run: gradle assembleDebug --stacktrace
 
       - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-renders
+          path: app/build/outputs/robolectric-screens/*.png
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
         with:
           name: aetherlinux-debug-apk
           path: app/build/outputs/apk/debug/*.apk

@@ -70,6 +70,7 @@ fun RealAppIcon(
             "gimp" -> GimpLogo(size)
             "files" -> LinuxFilesLogo(size)
             "gpu" -> GpuTuningLogo(size)
+            "linux-desktop" -> UbuntuDesktopLogo(size)
             "chrome", "com.android.chrome" -> GoogleChromeLogo(size)
             "photos", "com.google.android.apps.photos" -> GooglePhotosLogo(size)
             "youtube", "com.google.android.youtube" -> YouTubeLogo(size)
@@ -606,6 +607,52 @@ fun GpuTuningLogo(size: Dp) {
                 start = c,
                 end = Offset(c.x + r * 0.6f, c.y - r * 0.6f),
                 strokeWidth = 6f
+            )
+        }
+    }
+}
+
+/**
+ * Ubuntu Desktop (GNOME) icon: aubergine circle with a white monitor
+ */
+@Composable
+fun UbuntuDesktopLogo(size: Dp) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(Color(0xFF5E2750)),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.size(size * 0.6f)) {
+            val w = this.size.width
+            val h = this.size.height
+            // Screen
+            drawRoundRect(
+                color = Color.White,
+                topLeft = Offset(w * 0.1f, h * 0.15f),
+                size = androidx.compose.ui.geometry.Size(w * 0.8f, h * 0.5f),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.06f)
+            )
+            // Inner screen fill (aubergine)
+            drawRoundRect(
+                color = Color(0xFF77216F),
+                topLeft = Offset(w * 0.16f, h * 0.21f),
+                size = androidx.compose.ui.geometry.Size(w * 0.68f, h * 0.38f),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.03f)
+            )
+            // Stand
+            drawLine(
+                color = Color.White,
+                start = Offset(w * 0.5f, h * 0.65f),
+                end = Offset(w * 0.5f, h * 0.78f),
+                strokeWidth = w * 0.06f
+            )
+            drawLine(
+                color = Color.White,
+                start = Offset(w * 0.32f, h * 0.82f),
+                end = Offset(w * 0.68f, h * 0.82f),
+                strokeWidth = w * 0.06f
             )
         }
     }

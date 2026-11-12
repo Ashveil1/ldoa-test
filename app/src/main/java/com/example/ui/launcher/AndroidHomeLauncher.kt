@@ -51,6 +51,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.engine.WallpaperHelper
@@ -95,17 +96,17 @@ fun AndroidHomeLauncher(
     val homeApps = listOf(
         HomeScreenAppEntry("Terminal", "terminal", true, LinuxAppDefinition("terminal", "Terminal (Ubuntu PRoot)", "System", "", "bash", "terminal")),
         HomeScreenAppEntry("Files", "files", true, LinuxAppDefinition("files", "Files", "Utilities", "", "files", "folder")),
-        HomeScreenAppEntry("Code Studio", "editor", true, LinuxAppDefinition("editor", "Code Studio", "Development", "", "code", "code")),
-        HomeScreenAppEntry("LibreOffice", "office", true, LinuxAppDefinition("office", "LibreOffice", "Productivity", "", "office", "description")),
-        HomeScreenAppEntry("GIMP Paint", "gimp", true, LinuxAppDefinition("gimp", "GIMP Paint", "Graphics", "", "gimp", "brush")),
+        HomeScreenAppEntry("Code", "editor", true, LinuxAppDefinition("editor", "Code Studio", "Development", "", "code", "code")),
+        HomeScreenAppEntry("Office", "office", true, LinuxAppDefinition("office", "LibreOffice", "Productivity", "", "office", "description")),
+        HomeScreenAppEntry("GIMP", "gimp", true, LinuxAppDefinition("gimp", "GIMP Paint", "Graphics", "", "gimp", "brush")),
         HomeScreenAppEntry("Chrome", "com.android.chrome"),
         HomeScreenAppEntry("Photos", "com.google.android.apps.photos"),
         HomeScreenAppEntry("Camera", "com.android.camera2"),
         HomeScreenAppEntry("YouTube", "com.google.android.youtube"),
         HomeScreenAppEntry("Maps", "com.google.android.apps.maps"),
-        HomeScreenAppEntry("Keep Notes", "com.google.android.keep"),
-        HomeScreenAppEntry("GPU Hardware", "gpu", true, LinuxAppDefinition("gpu", "GPU Hardware", "Hardware", "", "virgl", "speed")),
-        HomeScreenAppEntry("Ubuntu Desktop", "linux-desktop", true, LinuxAppDefinition("linux-desktop", "Ubuntu Desktop (real)", "System", "", "gnome-session", "desktop_windows"))
+        HomeScreenAppEntry("Keep", "com.google.android.keep"),
+        HomeScreenAppEntry("GPU", "gpu", true, LinuxAppDefinition("gpu", "GPU Hardware", "Hardware", "", "virgl", "speed")),
+        HomeScreenAppEntry("Ubuntu", "linux-desktop", true, LinuxAppDefinition("linux-desktop", "Ubuntu Desktop (real)", "System", "", "gnome-session", "desktop_windows"))
     )
 
     BoxWithConstraints(
@@ -235,7 +236,8 @@ fun AndroidHomeLauncher(
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Medium,
                                 textAlign = TextAlign.Center,
-                                maxLines = 1
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }

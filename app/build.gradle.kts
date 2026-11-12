@@ -166,3 +166,6 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
 }
+
+// Robolectric native-graphics renders need headroom (full-screen bitmaps)
+tasks.withType<Test> { maxHeapSize = "2g" }

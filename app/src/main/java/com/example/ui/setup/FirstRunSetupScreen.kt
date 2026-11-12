@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.viewmodel.SetupState
@@ -58,11 +59,15 @@ fun FirstRunSetupScreen(state: SetupState, onRetry: () -> Unit) {
 
         when (state) {
             is SetupState.Running -> {
+                Text("${state.percent}%", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(16.dp))
                 LinearProgressIndicator(
                     progress = { state.percent / 100f },
                     modifier = Modifier.fillMaxWidth().height(6.dp),
                     color = Color(0xFF4E9A06),
-                    trackColor = Color(0xFF26262E)
+                    trackColor = Color(0xFF26262E),
+                    strokeCap = StrokeCap.Butt,
+                    drawStopIndicator = {}
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(state.status, color = Color(0xFF9A9AA2), fontSize = 13.sp, textAlign = TextAlign.Center)

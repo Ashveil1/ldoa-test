@@ -15,10 +15,10 @@ object Proot {
 
     data class Result(val exitCode: Int, val stdout: String, val stderr: String, val wallMs: Long)
 
-    private fun nativeDir(ctx: Context): String = ctx.applicationInfo.nativeLibraryDir
+    private fun nativeDir(ctx: Context): String? = ctx.applicationInfo.nativeLibraryDir
 
     fun binariesPresent(ctx: Context): Boolean {
-        val nd = File(nativeDir(ctx))
+        val nd = nativeDir(ctx)?.let(::File) ?: return false
         return listOf("libproot.so", "libproot_loader.so", "libtalloc.so", "libandroid-shmem.so")
             .all { File(nd, it).canExecute() || File(nd, it).exists() }
     }
@@ -49,7 +49,7 @@ object Proot {
         return exec(ctx, args, extraEnv)
     }
 
-    private fun prootPath(ctx: Context) = File(nativeDir(ctx), "libproot.so").absolutePath
+    private fun prootPath(ctx: Context) = File(nativeDir(ctx) ?: "", "libproot.so").absolutePath
 
     /** The Termux-built proot has a baked temp dir under com.termux that does
      *  not exist for us; without PROOT_TMP_DIR temp-file creation fails and
@@ -58,7 +58,7 @@ object Proot {
         File(ctx.cacheDir, "proot-tmp").apply { mkdirs() }
 
     private fun exec(ctx: Context, argv: List<String>, extraEnv: Map<String, String> = emptyMap()): Result {
-        val nd = nativeDir(ctx)
+        val nd = nativeDir(ctx) ?: return Result(-1, "", "proot binaries unavailable (no nativeLibraryDir)", 0)
         val env = mutableMapOf(
             "PROOT_LOADER" to File(nd, "libproot_loader.so").absolutePath,
             "PROOT_LOADER_32" to File(nd, "libproot_loader32.so").absolutePath,
