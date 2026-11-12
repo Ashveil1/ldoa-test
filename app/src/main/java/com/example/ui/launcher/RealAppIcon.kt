@@ -53,7 +53,7 @@ fun RealAppIcon(
         Image(
             bitmap = realBitmap.asImageBitmap(),
             contentDescription = keyOrPackage,
-            modifier = clickableModifier.clip(CircleShape)
+            modifier = clickableModifier.clip(RoundedCornerShape(size * 0.24f))
         )
         return
     }
@@ -95,7 +95,7 @@ fun UbuntuTerminalLogo(size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(size * 0.24f))
             .background(Color(0xFF300A24)),
         contentAlignment = Alignment.Center
     ) {
@@ -136,8 +136,7 @@ fun GoogleChromeLogo(size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
-            .background(Color.White),
+            .clip(RoundedCornerShape(size * 0.24f)),
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.size(size)) {
@@ -190,11 +189,11 @@ fun GooglePhotosLogo(size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(size * 0.24f))
             .background(Color.White),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.size(size * 0.8f)) {
+        Canvas(modifier = Modifier.size(size * 0.94f)) {
             val w = this.size.width
             val h = this.size.height
             val r = w * 0.28f
@@ -216,7 +215,7 @@ fun YouTubeLogo(size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(size * 0.24f))
             .background(Color.White),
         contentAlignment = Alignment.Center
     ) {
@@ -248,7 +247,7 @@ fun VSCodeLogo(size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(size * 0.24f))
             .background(Color(0xFF007ACC)),
         contentAlignment = Alignment.Center
     ) {
@@ -278,7 +277,7 @@ fun LibreOfficeLogo(size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(size * 0.24f))
             .background(Color(0xFF18A303)),
         contentAlignment = Alignment.Center
     ) {
@@ -314,7 +313,7 @@ fun GimpLogo(size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(size * 0.24f))
             .background(Color(0xFF5C3566)),
         contentAlignment = Alignment.Center
     ) {
@@ -343,7 +342,7 @@ fun GoogleCameraLogo(size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(size * 0.24f))
             .background(Color(0xFF2E3138)),
         contentAlignment = Alignment.Center
     ) {
@@ -380,7 +379,7 @@ fun GooglePhoneLogo(size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(size * 0.24f))
             .background(Color(0xFF34A853)),
         contentAlignment = Alignment.Center
     ) {
@@ -407,7 +406,7 @@ fun GoogleMessagesLogo(size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(size * 0.24f))
             .background(Color(0xFF4285F4)),
         contentAlignment = Alignment.Center
     ) {
@@ -437,7 +436,7 @@ fun AndroidSettingsLogo(size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(size * 0.24f))
             .background(Color(0xFF5F6368)),
         contentAlignment = Alignment.Center
     ) {
@@ -458,7 +457,7 @@ fun GoogleMapsLogo(size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(size * 0.24f))
             .background(Color.White),
         contentAlignment = Alignment.Center
     ) {
@@ -486,7 +485,7 @@ fun GoogleKeepLogo(size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(size * 0.24f))
             .background(Color(0xFFFBBC04)),
         contentAlignment = Alignment.Center
     ) {
@@ -508,7 +507,7 @@ fun GoogleDriveLogo(size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(size * 0.24f))
             .background(Color.White),
         contentAlignment = Alignment.Center
     ) {
@@ -531,7 +530,7 @@ fun GooglePlayLogo(size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(size * 0.24f))
             .background(Color.White),
         contentAlignment = Alignment.Center
     ) {
@@ -557,7 +556,7 @@ fun LinuxFilesLogo(size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(size * 0.24f))
             .background(Color(0xFF1976D2)),
         contentAlignment = Alignment.Center
     ) {
@@ -587,7 +586,7 @@ fun GpuTuningLogo(size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(size * 0.24f))
             .background(Color(0xFFE95420)), // Ubuntu Orange
         contentAlignment = Alignment.Center
     ) {
@@ -620,7 +619,7 @@ fun UbuntuDesktopLogo(size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(size * 0.24f))
             .background(Color(0xFF5E2750)),
         contentAlignment = Alignment.Center
     ) {
@@ -678,7 +677,7 @@ fun GenericAdaptiveLogo(nameOrPkg: String, size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(size * 0.24f))
             .background(color),
         contentAlignment = Alignment.Center
     ) {

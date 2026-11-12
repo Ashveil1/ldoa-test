@@ -72,7 +72,17 @@ class PRootUbuntuDistroEngine(private val context: Context) {
     }
 
     private fun promptLine(): String =
-        "${_currentUser.value}@ubuntu-noble:${_currentWorkingDir.value}# "
+        "${_currentUser.value}@ubuntu-noble:${_currentWorkingDir.value.replace("/root", "~")}# "
+
+    /** Shell echoes of lines WE sent (no pty, so `bash -i` echoes its
+     *  stdin). Swallowed in drain order so the user sees each command once
+     *  (our prompt-led local echo) instead of twice. */
+    private val pendingEcho = ArrayDeque<String>()
+
+    /** cwd travels out-of-band: the guest writes it to this file after each
+     *  command; nothing about tracking ever enters the visible stream. */
+    private val cwdFile: File
+        get() = File(rootfsDir, "tmp/.aether_cwd")
 
     private suspend fun bootRealGuest() {
         appendLines(listOf(
@@ -124,6 +134,7 @@ class PRootUbuntuDistroEngine(private val context: Context) {
         if (java.io.File(rootfsDir, "bin/bash").exists()) "bash" else "dash"
 
     private fun startSession() {
+        pendingEcho.clear()
         val s = TerminalSession(
             context, rootfsDir,
             fakeRoot = true, // apt/dpkg refuse to run as non-root
@@ -150,18 +161,26 @@ class PRootUbuntuDistroEngine(private val context: Context) {
         val snap = session?.snapshot() ?: return
         if (snap.length <= delivered) return
         val fresh = snap.substring(delivered)
-        delivered = snap.length
-        // Strip the cwd marker lines before display; update cwd from them.
+        // Only consume COMPLETE lines; a chunk can end mid-line and a
+        // partial line must not be echo-matched or displayed half-formed.
+        val lastNl = fresh.lastIndexOf('\n')
+        if (lastNl < 0) return
+        delivered += lastNl + 1
         val outLines = mutableListOf<String>()
-        for (line in fresh.split("\n")) {
-            val m = line.removePrefix("\r")
-            if (m.startsWith(PWD_MARKER)) {
-                _currentWorkingDir.value = m.removePrefix(PWD_MARKER).trim().ifEmpty { _currentWorkingDir.value }
-            } else {
-                outLines.add(line)
+        for (line in fresh.substring(0, lastNl + 1).split("\n")) {
+            val clean = line.removePrefix("\r").trimEnd()
+            if (pendingEcho.isNotEmpty() && clean == pendingEcho.first()) {
+                pendingEcho.removeFirst()
+                continue
             }
+            outLines.add(line.removeSuffix("\r"))
         }
         appendLines(outLines)
+        // Out-of-band cwd: written by the guest after every command.
+        runCatching {
+            val cwd = cwdFile.readText().trim()
+            if (cwd.isNotEmpty()) _currentWorkingDir.value = cwd
+        }
     }
 
     fun executeCommand(rawCommand: String) {
@@ -181,9 +200,12 @@ class PRootUbuntuDistroEngine(private val context: Context) {
             appendLines(listOf("guest not ready yet - install/boot still in progress."))
             return
         }
-        // The marker round-trip reports the real cwd after the command,
-        // covering cd, pushd and scripts that change directory.
-        s.send("$cmd\necho $PWD_MARKER\$PWD")
+        // cwd goes out-of-band (file, not stdout), so no marker line can
+        // ever leak into the terminal. The shell's echo of both sent lines
+        // is swallowed in drainSessionOutput via pendingEcho.
+        pendingEcho.addLast(cmd)
+        pendingEcho.addLast("pwd > /tmp/.aether_cwd")
+        s.send("$cmd\npwd > /tmp/.aether_cwd")
     }
 
     private fun refreshPackageState() {
@@ -213,7 +235,4 @@ class PRootUbuntuDistroEngine(private val context: Context) {
         }
     }
 
-    companion object {
-        private const val PWD_MARKER = "__AETHER_PWD:"
-    }
 }
