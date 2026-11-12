@@ -3,11 +3,20 @@ package com.example.vd
 import android.content.Context
 import android.util.Log
 import android.view.MotionEvent
+import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+
+interface VdBackend {
+    fun createDisplay(name: String, surface: Surface, w: Int, h: Int, dpi: Int): Int
+    fun resize(id: Int, w: Int, h: Int, dpi: Int)
+    fun release(id: Int)
+    fun launch(id: Int, component: String): Int
+    fun touch(id: Int, action: Int, x: Float, y: Float, downTime: Long)
+}
 
 /**
  * One panel = one VirtualDisplay rendered into this SurfaceView.
