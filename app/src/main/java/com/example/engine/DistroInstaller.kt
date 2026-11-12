@@ -117,7 +117,14 @@ class DistroInstaller(private val ctx: Context) {
         File(ctx.filesDir, "dl/${d.id}.tar.gz.tmp").delete()
     }
 
-    private val installLock = Mutex()
+    private companion object {
+        /** Process-wide: gate (ViewModel), terminal engine and X server each
+         *  construct their own DistroInstaller, so a per-instance lock let
+         *  two installers race on the same shared tmp download file (observed
+         *  on device: one path's 416-cleanup deleted the tmp mid-verify in
+         *  the other, ENOENT). All instances must serialize on ONE lock. */
+        val installLock = Mutex()
+    }
 
     suspend fun install(d: Distro, onState: (InstallState) -> Unit): Boolean = withContext(Dispatchers.IO) {
         installLock.withLock {
