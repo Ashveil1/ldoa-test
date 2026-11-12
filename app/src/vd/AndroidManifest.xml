@@ -7,5 +7,8 @@
             android:exported="true"
             android:multiprocess="false"
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+        <activity
+            android:name="com.example.vd.VdSmokeActivity"
+            android:exported="true" />
     </application>
 </manifest>

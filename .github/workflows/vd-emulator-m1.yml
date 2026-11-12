@@ -1,0 +1,105 @@
+name: vd-emulator-m1
+
+# M1 proof for the VirtualDisplay track (docs/VDISPLAY_SPEC.md): real
+# Shizuku server on a google_apis emulator (adb root), Settings rendered
+# into a VdPanel, screencap asserted non-black. Runs only on the vd branch.
+on:
+  push:
+    branches: [feat/vdisplay]
+  workflow_dispatch:
+
+jobs:
+  m1:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Apply vendored termux-x11 patches
+        run: git -C third_party/termux-x11 apply ../../patches/termux-x11-vendored.patch
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install Gradle 9.3.1
+        run: |
+          curl -sSL -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-9.3.1-bin.zip
+          sudo unzip -q /tmp/gradle.zip -d /opt
+          echo "/opt/gradle-9.3.1/bin" >> "$GITHUB_PATH"
+
+      - name: Decode fixed debug keystore
+        run: echo "${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}" | base64 -d > debug.keystore
+
+      - name: Install native build tools
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq bison
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'ndk;29.0.14206865' 'cmake;3.22.1'
+
+      - name: Build vd APK
+        run: gradle assembleVdDebug --stacktrace
+
+      - name: Download Shizuku v13.6.0
+        run: curl -sL -o shizuku.apk https://github.com/RikkaApps/Shizuku/releases/download/v13.6.0/shizuku-v13.6.0.r1086.2650830c-release.apk
+
+      - name: M1 emulator proof
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-snapshot-save -gpu swiftshader_indirect
+          disable-animations: true
+          script: |
+            set -x
+            adb wait-for-device
+            adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done'
+            adb root
+            sleep 3
+            adb wait-for-device
+            adb install -r app/build/outputs/apk/vd/debug/app-vd-debug.apk
+            adb install -r shizuku.apk
+            # Start the Shizuku server as root (emulator dev path per
+            # docs/VDISPLAY_DEPS.md - same code path as on-device adb start).
+            adb shell 'nohup sh /sdcard/Android/data/moe.shizuku.privileged.api/start.sh > /sdcard/shizuku.log 2>&1 &'
+            sleep 10
+            adb shell cat /sdcard/shizuku.log || true
+            adb shell am start -n com.aistudio.aetherlinux.pxkdmv.vd/com.example.vd.VdSmokeActivity
+            sleep 12
+            # Grant the Shizuku permission dialog if it is showing.
+            for i in 1 2 3 4; do
+              adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+              adb pull /sdcard/ui.xml ui.xml >/dev/null 2>&1
+              B=$(grep -o 'text="Allow all the time"[^>]*bounds="[^"]*"' ui.xml | grep -o 'bounds="[^"]*"' | head -1)
+              [ -z "$B" ] && B=$(grep -o 'text="Allow"[^>]*bounds="[^"]*"' ui.xml | grep -o 'bounds="[^"]*"' | head -1)
+              [ -z "$B" ] && break
+              C=$(echo "$B" | sed 's/bounds="\[\([0-9]*\),\([0-9]*\)\]\[\([0-9]*\),\([0-9]*\)\]"/echo $(( (\1+\3)\/2 )) $(( (\2+\4)\/2 ))/e')
+              echo "tapping allow at $C"
+              adb shell input tap $C
+              sleep 4
+            done
+            # Let the service bind, the display be created and Settings draw.
+            sleep 20
+            adb exec-out screencap -p > vd-m1.png
+            ls -la vd-m1.png
+            MEAN=$(identify -format "%[mean]" vd-m1.png)
+            echo "screenshot mean pixel value: $MEAN"
+            # An all-black 1080x2400 frame has mean ~0; a rendered Settings
+            # window is far above. Threshold 500/65535 (~0.8% white) still
+            # counts a mostly-dark frame with any real content as non-black.
+            python3 - "$MEAN" <<'PY'
+            import sys
+            mean = float(sys.argv[1])
+            print("PASS: non-black frame" if mean > 500 else "FAIL: frame is black", "mean =", mean)
+            sys.exit(0 if mean > 500 else 1)
+            PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vd-m1-screenshot
+          path: vd-m1.png
+          retention-days: 14
