@@ -46,14 +46,21 @@ done
 # Let the service bind, the display be created and Settings draw.
 sleep 20
 
+# Evidence: state transitions from the smoke activity.
+adb logcat -d -s VdSmoke:I > vd-logcat.txt || true
+cat vd-logcat.txt
+READY=$(grep -c 'state=READY' vd-logcat.txt || true)
+echo "state=READY lines: $READY"
+
 # PNG for the artifact + raw RGBA for the assert (ubuntu-24.04 runners
 # have no ImageMagick; raw screencap needs no decoder).
 adb exec-out screencap -p > vd-m1.png
 adb exec-out screencap > vd-m1.raw
 ls -la vd-m1.png vd-m1.raw
-python3 - <<'PY'
+python3 - vd-m1.raw "$READY" <<'PY'
 import struct, sys
-d = open('vd-m1.raw','rb').read()
+d = open(sys.argv[1], 'rb').read()
+ready = int(sys.argv[2])
 w, h, fmt = struct.unpack('<III', d[:12])
 px = d[12:]
 n = len(px) // 4
@@ -66,8 +73,10 @@ for i in range(0, n * 4, 4):
         nonblack += 1
 mean = total / (n * 3)
 frac = nonblack / n
-print(f"frame {w}x{h} fmt={fmt} mean={mean:.1f} nonblack={frac*100:.1f}%")
-ok = frac > 0.01
-print("PASS: non-black frame" if ok else "FAIL: frame is black")
+print(f"frame {w}x{h} fmt={fmt} mean={mean:.1f} nonblack={frac*100:.1f}% ready_lines={ready}")
+# A rendered Settings window is mostly light: demand >=20% non-black so
+# a title-bar-only frame (like the NEED_PERMISSION run, 9%) fails.
+ok = ready > 0 and frac >= 0.20
+print("PASS: VD rendered" if ok else "FAIL: no READY state or black panel")
 sys.exit(0 if ok else 1)
 PY
