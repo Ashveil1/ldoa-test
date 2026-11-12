@@ -138,18 +138,55 @@ class InstalledAppsManager(private val context: Context) {
         return bitmap
     }
 
-    fun launchApp(packageName: String): Boolean {
+    /** Device support for freeform windows (Ash's choice A: Android-native
+     *  floating, device-dependent). The public API path is
+     *  ActivityOptions.setLaunchBounds; whether the system honors it depends
+     *  on the device's windowing support. */
+    enum class FreeformSupport { SUPPORTED, DEV_OPTION_NEEDED, UNSUPPORTED }
+
+    fun freeformSupport(): FreeformSupport {
+        val pm = context.packageManager
+        if (pm.hasSystemFeature("android.software.freeform_window_management"))
+            return FreeformSupport.SUPPORTED
+        val dev = runCatching {
+            android.provider.Settings.Global.getInt(context.contentResolver, "enable_freeform_support", 0)
+        }.getOrDefault(0)
+        return if (dev == 1) FreeformSupport.SUPPORTED else FreeformSupport.DEV_OPTION_NEEDED
+    }
+
+    /** Centered ~70% bounds for the freeform request. */
+    private fun freeformBounds(): android.graphics.Rect {
+        val dm = context.resources.displayMetrics
+        val w = (dm.widthPixels * 0.7f).toInt().coerceAtLeast(480)
+        val h = (dm.heightPixels * 0.7f).toInt().coerceAtLeast(640)
+        return android.graphics.Rect(
+            (dm.widthPixels - w) / 2, (dm.heightPixels - h) / 2,
+            (dm.widthPixels + w) / 2, (dm.heightPixels + h) / 2
+        )
+    }
+
+    /** Launch the app floating (freeform) when the device supports it;
+     *  falls back to a normal full-screen launch otherwise. Returns the
+     *  mode actually used so the UI can say what happened. */
+    fun launchApp(packageName: String): Boolean = launchAppFreeform(packageName) != LaunchMode.FAILED
+
+    fun launchAppFreeform(packageName: String): LaunchMode {
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName) ?: return LaunchMode.FAILED
+        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+        val opts = android.app.ActivityOptions.makeBasic()
+        opts.launchBounds = freeformBounds()
         return try {
-            val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
-            if (launchIntent != null) {
-                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(launchIntent)
-                true
-            } else {
-                false
-            }
+            context.startActivity(launchIntent, opts.toBundle())
+            if (freeformSupport() == FreeformSupport.SUPPORTED) LaunchMode.FREEFORM else LaunchMode.FULLSCREEN_FALLBACK
         } catch (_: Exception) {
-            false
+            try {
+                context.startActivity(launchIntent)
+                LaunchMode.FULLSCREEN_FALLBACK
+            } catch (_: Exception) {
+                LaunchMode.FAILED
+            }
         }
     }
+
+    enum class LaunchMode { FREEFORM, FULLSCREEN_FALLBACK, FAILED }
 }
