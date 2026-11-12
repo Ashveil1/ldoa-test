@@ -120,6 +120,9 @@ class PRootUbuntuDistroEngine(private val context: Context) {
         startSession()
     }
 
+    private fun sessionShellName(): String =
+        if (java.io.File(rootfsDir, "bin/bash").exists()) "bash" else "dash"
+
     private fun startSession() {
         val s = TerminalSession(
             context, rootfsDir,
@@ -132,7 +135,7 @@ class PRootUbuntuDistroEngine(private val context: Context) {
             return
         }
         _ready.value = true
-        appendLines(listOf("real guest shell up (proot -0, dash). Type commands below."))
+        appendLines(listOf("real guest shell up (proot -0, ${sessionShellName()}). Type commands below."))
         // apt needs its index once per fresh rootfs; run quietly in background.
         scope.launch {
             appendLines(listOf("refreshing apt index (first-boot, one time)…"))

@@ -3,6 +3,7 @@ package com.example.engine
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.util.Log
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class InstalledAppsManager(private val context: Context) {
+    private val TAG = "InstalledApps"
 
     private val scope = CoroutineScope(Dispatchers.IO)
     private val _androidApps = MutableStateFlow<List<AndroidAppItem>>(emptyList())
@@ -154,6 +156,22 @@ class InstalledAppsManager(private val context: Context) {
         return if (dev == 1) FreeformSupport.SUPPORTED else FreeformSupport.DEV_OPTION_NEEDED
     }
 
+    /** Vendor ROM label for honest UI hints ("HyperOS 2", "MIUI 14", or null).
+     *  MIUI/HyperOS floating windows are a vendor system; AOSP freeform is
+     *  usually disabled there, so the panel can set expectations. */
+    fun vendorRom(): String? {
+        fun prop(key: String): String = runCatching {
+            val sp = Class.forName("android.os.SystemProperties")
+                .getDeclaredMethod("get", String::class.java)
+            (sp.invoke(null, key) as String).trim()
+        }.getOrDefault("")
+        val hyper = prop("ro.mi.os.version.name")
+        if (hyper.isNotEmpty()) return "HyperOS $hyper"
+        val miui = prop("ro.miui.ui.version.name")
+        if (miui.isNotEmpty()) return "MIUI $miui"
+        return null
+    }
+
     /** Centered ~70% bounds for the freeform request. */
     private fun freeformBounds(): android.graphics.Rect {
         val dm = context.resources.displayMetrics
@@ -170,11 +188,41 @@ class InstalledAppsManager(private val context: Context) {
      *  mode actually used so the UI can say what happened. */
     fun launchApp(packageName: String): Boolean = launchAppFreeform(packageName) != LaunchMode.FAILED
 
+    /**
+     * Best-effort hidden-API freeform request: ActivityOptions
+     * .setLaunchWindowingMode(WINDOWING_MODE_FREEFORM=5) is @hide, so call it
+     * through meta-reflection (Class.class.getDeclaredMethod) which bypasses
+     * the hidden-API enforcement on API 28+. Whether the ROM then HONORS the
+     * request is a separate question - stock AOSP with the freeform dev
+     * option does; MIUI/HyperOS may still ignore it (its floating windows
+     * are a separate vendor system). This only ever ADDS a hint; callers
+     * already handle the fullscreen fallback honestly.
+     */
+    private fun requestFreeformWindowingMode(opts: android.app.ActivityOptions): Boolean {
+        return try {
+            val meta = Class::class.java.getDeclaredMethod(
+                "getDeclaredMethod", String::class.java, arrayOfNulls<Class<*>>(0).javaClass
+            )
+            val m = meta.invoke(
+                android.app.ActivityOptions::class.java,
+                "setLaunchWindowingMode",
+                arrayOf(Int::class.javaPrimitiveType)
+            ) as java.lang.reflect.Method
+            m.isAccessible = true
+            m.invoke(opts, 5)
+            true
+        } catch (t: Throwable) {
+            Log.d(TAG, "setLaunchWindowingMode unavailable: ${t.message}")
+            false
+        }
+    }
+
     fun launchAppFreeform(packageName: String): LaunchMode {
         val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName) ?: return LaunchMode.FAILED
         launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
         val opts = android.app.ActivityOptions.makeBasic()
         opts.launchBounds = freeformBounds()
+        val windowingModeSet = requestFreeformWindowingMode(opts)
         return try {
             context.startActivity(launchIntent, opts.toBundle())
             if (freeformSupport() == FreeformSupport.SUPPORTED) LaunchMode.FREEFORM else LaunchMode.FULLSCREEN_FALLBACK

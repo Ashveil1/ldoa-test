@@ -25,6 +25,7 @@ data class Distro(
     val displayName: String,
     val description: String,
     val url: String,
+    val mirrors: List<String> = emptyList(),
     val sha256: String,
     val sizeBytes: Long,
     val pkgMgr: PkgMgr,
@@ -71,12 +72,16 @@ object Distros {
         displayName = "Ubuntu",
         description = "Ubuntu 24.04 userland, GNOME desktop (experimental, large download).",
         url = "$UBUNTU_BASE/ubuntu-base-$UBUNTU_VER-base-arm64.tar.gz",
+        // sha256-verified mirror on GitHub releases: cdimage is unreachable or
+        // carrier-proxy-mangled on some networks (observed on real device).
+        mirrors = listOf("https://github.com/Ashveil1/ldoa-test/releases/download/rootfs-mirror-v1/ubuntu-base-$UBUNTU_VER-base-arm64.tar.gz"),
         sha256 = "a91d5a93010193712d346d761372b7c9db6dfcf093893161c64ca107f05914f2",
         sizeBytes = 29_900_000L, // approx; real length comes from Content-Length
         pkgMgr = PkgMgr.APT
     )
     private val UBUNTU_X86_64 = UBUNTU_ARM64.copy(
         url = "$UBUNTU_BASE/ubuntu-base-$UBUNTU_VER-base-amd64.tar.gz",
+        mirrors = listOf("https://github.com/Ashveil1/ldoa-test/releases/download/rootfs-mirror-v1/ubuntu-base-$UBUNTU_VER-base-amd64.tar.gz"),
         sha256 = "e77b6f10c2590cef872b33ee9f635a0e3fd1f57fb074c0e52b5c7f56147a0c86",
         sizeBytes = 30_000_000L // approx
     )
@@ -130,7 +135,20 @@ class DistroInstaller(private val ctx: Context) {
         return try {
             // download with resume
             onState(InstallState.Downloading(tmp.length().coerceAtLeast(0), d.sizeBytes))
-            download(d.url, tmp, d.sizeBytes) { done, total -> onState(InstallState.Downloading(done, total)) }
+            val sources = listOf(d.url) + d.mirrors
+            var lastError: Throwable? = null
+            var downloaded = false
+            for (src in sources) {
+                try {
+                    download(src, tmp, d.sizeBytes) { done, total -> onState(InstallState.Downloading(done, total)) }
+                    downloaded = true
+                    break
+                } catch (t: Throwable) {
+                    lastError = t
+                    Log.w(TAG, "download from $src failed: ${t.message}")
+                }
+            }
+            if (!downloaded) throw (lastError ?: java.io.IOException("all mirrors failed"))
 
             // verify
             onState(InstallState.Verifying)
@@ -194,6 +212,7 @@ class DistroInstaller(private val ctx: Context) {
             if (existing > 0) setRequestProperty("Range", "bytes=$existing-")
         }
         val code = conn.responseCode
+        var serverTotal = -1L // authoritative full-file size when the server tells us
         when {
             code == 416 -> { dest.delete(); throw java.io.IOException("resume rejected (416); retrying clean next attempt") }
             code == 206 -> {
@@ -201,12 +220,14 @@ class DistroInstaller(private val ctx: Context) {
                 val cr = conn.getHeaderField("Content-Range") ?: ""
                 val start = cr.removePrefix("bytes ").substringBefore('-').toLongOrNull()
                 if (start != existing) { dest.delete(); throw java.io.IOException("bad Content-Range: $cr") }
+                serverTotal = cr.substringAfter('/', "").toLongOrNull() ?: -1L
             }
             code in 200..299 -> if (existing > 0) dest.delete() // server ignored Range: restart clean
             else -> throw java.io.IOException("HTTP $code downloading distro")
         }
         val append = code == 206
-        val total = if (code == 206) existing + conn.contentLengthLong else conn.contentLengthLong
+        if (serverTotal <= 0) serverTotal = if (append) existing + conn.contentLengthLong else conn.contentLengthLong
+        val total = serverTotal
         conn.inputStream.use { input ->
             FileOutputStream(dest, append).use { out ->
                 val buf = ByteArray(64 * 1024)
@@ -217,6 +238,13 @@ class DistroInstaller(private val ctx: Context) {
                     onProgress(done, if (total > 0) total else expected)
                 }
             }
+        }
+        // A truncated body must never reach the checksum stage as a "full"
+        // file, and an over-long file means a proxy appended garbage: both
+        // are fatal for this attempt and the partial is poison - drop it.
+        if (total > 0 && dest.length() != total) {
+            dest.delete()
+            throw java.io.IOException("size mismatch (got ${dest.length()}, expected $total); partial dropped")
         }
     }
 

@@ -25,6 +25,10 @@ class TerminalSession(
     private val running = AtomicBoolean(false)
     private val lock = Any()
 
+    /** bash when the guest has it (ubuntu-base does), else sh/dash. */
+    val guestShell: String =
+        if (File(rootfs, "bin/bash").exists()) "/bin/bash" else "/bin/sh"
+
     fun start(): Boolean {
         if (running.get()) return true
         val nd = ctx.applicationInfo.nativeLibraryDir
@@ -39,7 +43,7 @@ class TerminalSession(
             // non-interactive busybox sh never prints a prompt, leaving the
             // terminal looking dead. -i gives prompt + echo; it prints one
             // "can't access tty" job-control notice, which is authentic.
-            "/bin/sh", "-i"
+            guestShell, "-i"
         )
         return try {
             val tmp = File(ctx.filesDir, "usr/tmp").apply { mkdirs() }

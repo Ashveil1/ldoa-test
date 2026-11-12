@@ -361,6 +361,7 @@ fun AndroidAppFloatingView(
 ) {
     val context = LocalContext.current
     val support = remember { appsManager.freeformSupport() }
+    val rom = remember { appsManager.vendorRom() }
     var launchResult by remember { mutableStateOf<InstalledAppsManager.LaunchMode?>(null) }
     // Auto-launch floating only when the device actually supports freeform;
     // auto-yanking the user into a fullscreen app would be worse than the panel.
@@ -428,6 +429,14 @@ fun AndroidAppFloatingView(
                     color = YaruTextMuted,
                     fontSize = 11.sp
                 )
+                if (rom != null && support != InstalledAppsManager.FreeformSupport.SUPPORTED) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "$rom: its built-in floating windows are a separate vendor feature - open Recents, long-press the app's icon, tap the floating-window icon. AOSP freeform (what apps can request) is usually disabled on this ROM.",
+                        color = YaruTextMuted,
+                        fontSize = 11.sp
+                    )
+                }
                 launchResult?.let { r ->
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
