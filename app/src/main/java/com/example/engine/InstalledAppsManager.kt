@@ -172,6 +172,23 @@ class InstalledAppsManager(private val context: Context) {
         return null
     }
 
+    /** If we hold WRITE_SECURE_SETTINGS (one-time adb/Shizuku grant, the same
+     *  one Taskbar asks for), flip the global freeform switches ourselves.
+     *  Returns the resulting support state. Technique credit:
+     *  farmerbb/Taskbar (Apache 2.0). */
+    private fun tryEnableFreeformWithSecureSettings(): FreeformSupport {
+        if (freeformSupport() == FreeformSupport.SUPPORTED) return FreeformSupport.SUPPORTED
+        val granted = context.checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            runCatching {
+                android.provider.Settings.Global.putInt(context.contentResolver, "enable_freeform_support", 1)
+                android.provider.Settings.Global.putInt(context.contentResolver, "force_resizable_activities", 1)
+            }
+        }
+        return freeformSupport()
+    }
+
     /** Centered ~70% bounds for the freeform request. */
     private fun freeformBounds(): android.graphics.Rect {
         val dm = context.resources.displayMetrics
@@ -220,9 +237,11 @@ class InstalledAppsManager(private val context: Context) {
     fun launchAppFreeform(packageName: String): LaunchMode {
         val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName) ?: return LaunchMode.FAILED
         launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+        tryEnableFreeformWithSecureSettings()
         val opts = android.app.ActivityOptions.makeBasic()
         opts.launchBounds = freeformBounds()
         val windowingModeSet = requestFreeformWindowingMode(opts)
+        Log.d(TAG, "freeform launch $packageName: windowingModeSet=$windowingModeSet support=${freeformSupport()} rom=${vendorRom()}")
         return try {
             context.startActivity(launchIntent, opts.toBundle())
             if (freeformSupport() == FreeformSupport.SUPPORTED) LaunchMode.FREEFORM else LaunchMode.FULLSCREEN_FALLBACK

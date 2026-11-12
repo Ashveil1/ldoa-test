@@ -429,6 +429,14 @@ fun AndroidAppFloatingView(
                     color = YaruTextMuted,
                     fontSize = 11.sp
                 )
+                if (support == InstalledAppsManager.FreeformSupport.DEV_OPTION_NEEDED) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "One-time fix (same grant Taskbar uses): with wireless debugging paired, run `pm grant com.aistudio.aetherlinux.pxkdmv android.permission.WRITE_SECURE_SETTINGS` - then this app enables floating by itself, permanently.",
+                        color = YaruTextMuted,
+                        fontSize = 11.sp
+                    )
+                }
                 if (rom != null && support != InstalledAppsManager.FreeformSupport.SUPPORTED) {
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
