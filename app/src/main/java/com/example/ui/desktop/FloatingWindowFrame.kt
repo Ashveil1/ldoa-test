@@ -124,10 +124,21 @@ fun FloatingWindowFrame(
             Triple(IntOffset(halfPx, topPx), halfW.dp, availableHeight.dp)
         }
         else -> {
-            val xPx = with(density) { (window.position.x + 52f).dp.roundToPx() }
-            val yPx = with(density) { (window.position.y + 30f).dp.roundToPx() }
-            val wDp = (window.size.width.value + resizeDeltaW).coerceIn(240f, 900f).dp
-            val hDp = (window.size.height.value + resizeDeltaH).coerceIn(180f, 800f).dp
+            val wDp = (window.size.width.value + resizeDeltaW)
+                .coerceIn(240f, 900f)
+                .coerceAtMost(parentWidthDp)
+                .dp
+            val hDp = (window.size.height.value + resizeDeltaH)
+                .coerceIn(180f, 800f)
+                .coerceAtMost(parentHeightDp)
+                .dp
+            // Clamp on-screen: the +52/+30 Ubuntu desktop offsets can push a
+            // window past the right edge on the phone launcher (real-device
+            // bug: Photos panel cut off at the screen edge).
+            val maxX = (parentWidthDp - wDp.value).coerceAtLeast(0f)
+            val maxY = (parentHeightDp - hDp.value).coerceAtLeast(0f)
+            val xPx = with(density) { (window.position.x + 52f).coerceIn(0f, maxX).dp.roundToPx() }
+            val yPx = with(density) { (window.position.y + 30f).coerceIn(0f, maxY).dp.roundToPx() }
             Triple(IntOffset(xPx, yPx), wDp, hDp)
         }
     }
@@ -449,7 +460,7 @@ fun AndroidAppFloatingView(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = when (r) {
-                            InstalledAppsManager.LaunchMode.FREEFORM -> "Launched floating."
+                            InstalledAppsManager.LaunchMode.FREEFORM -> "Floating requested. If it opened fullscreen anyway, this ROM ignored the request (vendor floating is a separate system - see above)."
                             InstalledAppsManager.LaunchMode.FULLSCREEN_FALLBACK -> "Device ignored floating - opened fullscreen."
                             InstalledAppsManager.LaunchMode.FAILED -> "Launch failed."
                         },
