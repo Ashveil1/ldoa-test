@@ -14,7 +14,7 @@ android {
 
   defaultConfig {
     applicationId = "com.aistudio.aetherlinux.pxkdmv"
-    minSdk = 24
+    minSdk = 26
     targetSdk = 36
     versionCode = 1
     versionName = "1.0"
@@ -64,6 +64,12 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+  packaging {
+    // extractNativeLibs=true requires legacy (uncompressed) packaging so the
+    // proot binaries in jniLibs land as real executable files.
+    jniLibs { useLegacyPackaging = true }
+  }
+
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true
@@ -83,6 +89,7 @@ googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.W
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
 dependencies {
+  implementation("org.apache.commons:commons-compress:1.27.1")
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)
