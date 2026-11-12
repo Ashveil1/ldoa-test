@@ -15,6 +15,13 @@ jobs:
           # xkbcomp, pixman, ...) that :lorie's native build compiles.
           submodules: recursive
 
+      # The termux-x11 submodule is pinned to upstream nightly; our local
+      # patches (XSERVER_LIB preload hook, compileSdk bumps, LorieApp
+      # package-context fallback) live in patches/ and apply here so CI
+      # builds the same code local builds use.
+      - name: Apply vendored termux-x11 patches
+        run: git -C third_party/termux-x11 apply ../../patches/termux-x11-vendored.patch
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
