@@ -40,6 +40,17 @@ android {
     }
   }
 
+  flavorDimensions += "track"
+  productFlavors {
+    create("vd") {
+      dimension = "track"
+      // feat/vdisplay track (spec: VDISPLAY_SPEC.md): side-by-side install
+      // with the main app; vd-only code and deps live in src/vd / vdImplementation.
+      applicationIdSuffix = ".vd"
+      versionNameSuffix = "-vd"
+    }
+  }
+
   buildTypes {
     release {
       isCrunchPngs = false
@@ -53,9 +64,6 @@ android {
       // Do not remove or modify this signingConfig assignment. It is necessary for Android apps in
       // AI Studio.
       signingConfig = signingConfigs.getByName("debugConfig")
-      // feat/vdisplay track: installs side-by-side with the main app so the
-      // VirtualDisplay experiment never clobbers the proven floating build.
-      applicationIdSuffix = ".vd"
     }
   }
   compileOptions {
