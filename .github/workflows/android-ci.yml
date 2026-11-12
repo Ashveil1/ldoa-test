@@ -23,9 +23,15 @@ jobs:
       # The repo carries gradle-wrapper.properties but no gradlew script
       # or wrapper jar (AI Studio export), so run the pinned Gradle
       # directly instead of the wrapper.
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '9.3.1'
+      # The repo carries gradle-wrapper.properties but no gradlew script or
+      # wrapper jar (AI Studio export), and setup-gradle's provisioning
+      # failed on the runner image's stale /usr/bin/gradle - install the
+      # pinned Gradle directly instead.
+      - name: Install Gradle 9.3.1
+        run: |
+          curl -sSL -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-9.3.1-bin.zip
+          sudo unzip -q /tmp/gradle.zip -d /opt
+          echo "/opt/gradle-9.3.1/bin" >> "$GITHUB_PATH"
 
       # Fixed debug signing key arrives via the ANDROID_DEBUG_KEYSTORE_B64
       # repo secret (never committed, never in chat) so every CI APK is an
