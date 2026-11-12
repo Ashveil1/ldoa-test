@@ -88,8 +88,25 @@ googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.W
 
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
+configurations.all {
+  // The vendored :lorie module declares lifecycle-viewmodel-ktx:2.11.0, whose
+  // 2.11.0 family requires compileSdk 37 (not yet published as a platform).
+  // Pin the whole lifecycle group to the app's catalog version instead.
+  resolutionStrategy {
+    force(
+      "androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7",
+      "androidx.lifecycle:lifecycle-viewmodel:2.8.7",
+      "androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7",
+      "androidx.lifecycle:lifecycle-runtime:2.8.7",
+      "androidx.lifecycle:lifecycle-runtime-ktx:2.8.7",
+      "androidx.lifecycle:lifecycle-common:2.8.7"
+    )
+  }
+}
+
 dependencies {
   implementation("org.apache.commons:commons-compress:1.27.1")
+  implementation(project(":lorie"))
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)

@@ -29,6 +29,14 @@ class LinuxSubsystemEngine {
 
     private val _installedApps = MutableStateFlow<List<LinuxAppDefinition>>(listOf(
         LinuxAppDefinition(
+            id = "linux-desktop",
+            name = "Ubuntu Desktop (real)",
+            category = "System",
+            description = "Real Ubuntu 24.04 GNOME session via embedded X server and proot",
+            command = "gnome-session --session=ubuntu",
+            iconName = "desktop_windows"
+        ),
+        LinuxAppDefinition(
             id = "terminal",
             name = "Ubuntu Terminal",
             category = "System",

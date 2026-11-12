@@ -140,6 +140,12 @@ class AetherDesktopViewModel(application: Application) : AndroidViewModel(applic
         _isStartMenuOpen.value = false
         _isAppDrawerOpen.value = false
 
+        if (app.id == "linux-desktop") {
+            // Real path: vendored lorie X server + Ubuntu GNOME in proot.
+            com.example.engine.XServer.openDesktopApp(getApplication(), com.example.engine.Distros.UBUNTU)
+            return
+        }
+
         // Check if already open
         val existing = _windows.value.find { it.internalAppKey == app.id }
         if (existing != null) {
