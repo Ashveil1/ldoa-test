@@ -1,0 +1,42 @@
+name: android-ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # The repo carries gradle-wrapper.properties but no gradlew script
+      # or wrapper jar (AI Studio export), so run the pinned Gradle
+      # directly instead of the wrapper.
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      # The debug signingConfig points at ${rootDir}/debug.keystore, which
+      # .gitignore excludes by design (AI Studio generates it locally).
+      # CI generates an ephemeral one per run; nothing secret here.
+      - name: Generate ephemeral debug keystore
+        run: keytool -genkeypair -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Unit tests
+        run: gradle testDebugUnitTest --stacktrace
+
+      - name: Assemble debug APK
+        run: gradle assembleDebug --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aetherlinux-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 14
