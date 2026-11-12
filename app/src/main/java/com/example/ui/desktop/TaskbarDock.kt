@@ -410,7 +410,7 @@ fun StartMenuPopup(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    viewModel.openAndroidAppInWindow(androidApp.packageName, androidApp.appName)
+                                    viewModel.openAndroidAppSmart(androidApp.packageName, androidApp.appName)
                                     onDismiss()
                                 }
                                 .padding(vertical = 6.dp, horizontal = 4.dp),

@@ -228,14 +228,13 @@ class AetherDesktopViewModel(application: Application) : AndroidViewModel(applic
         _focusedWindowId.value = newWindow.id
     }
 
-    /** Launch an Android app floating when the device honors it; otherwise
-     *  open the in-app panel that explains the options (grant command,
-     *  developer option, HyperOS built-in route) instead of silently
-     *  yanking the user into a fullscreen app switch. */
+    /** Ash's call (2026-11-12): tapping an Android app opens it directly -
+     *  floating where the device honors it, fullscreen where it doesn't.
+     *  The guidance panel is the FALLBACK, shown only when the launch
+     *  itself fails. */
     fun openAndroidAppSmart(packageName: String, appName: String) {
-        if (appsManager.freeformSupport() == com.example.engine.InstalledAppsManager.FreeformSupport.SUPPORTED) {
-            appsManager.launchAppFreeform(packageName)
-        } else {
+        val result = appsManager.launchAppFreeform(packageName)
+        if (result == com.example.engine.InstalledAppsManager.LaunchMode.FAILED) {
             openAndroidAppInWindow(packageName, appName)
         }
     }
