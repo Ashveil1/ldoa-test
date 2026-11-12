@@ -3,6 +3,8 @@ package com.example.engine
 import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
@@ -110,11 +112,22 @@ class DistroInstaller(private val ctx: Context) {
         File(ctx.filesDir, "dl/${d.id}.tar.gz.tmp").delete()
     }
 
+    private val installLock = Mutex()
+
     suspend fun install(d: Distro, onState: (InstallState) -> Unit): Boolean = withContext(Dispatchers.IO) {
+        installLock.withLock {
+            // Concurrent callers (first-run gate + terminal engine) serialize
+            // here; the second one sees the completed install and returns.
+            if (isInstalled(d)) { onState(InstallState.Installed); return@withLock true }
+            installLocked(d, onState)
+        }
+    }
+
+    private suspend fun installLocked(d: Distro, onState: (InstallState) -> Unit): Boolean {
         val dlDir = File(ctx.filesDir, "dl").apply { mkdirs() }
         val tmp = File(dlDir, "${d.id}.tar.gz.tmp")
         val tgz = File(dlDir, "${d.id}.tar.gz")
-        try {
+        return try {
             // download with resume
             onState(InstallState.Downloading(tmp.length().coerceAtLeast(0), d.sizeBytes))
             download(d.url, tmp, d.sizeBytes) { done, total -> onState(InstallState.Downloading(done, total)) }
@@ -125,7 +138,7 @@ class DistroInstaller(private val ctx: Context) {
             if (!digest.equals(d.sha256, ignoreCase = true)) {
                 tmp.delete()
                 onState(InstallState.Failed("Checksum mismatch (got ${digest.take(12)}…). Try again."))
-                return@withContext false
+                return false
             }
             tmp.renameTo(tgz)
 

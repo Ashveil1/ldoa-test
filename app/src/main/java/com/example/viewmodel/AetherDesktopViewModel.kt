@@ -26,6 +26,13 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.UUID
 
+sealed interface SetupState {
+    data object Idle : SetupState
+    data class Running(val percent: Int, val status: String) : SetupState
+    data class Failed(val message: String) : SetupState
+    data object Done : SetupState
+}
+
 class AetherDesktopViewModel(application: Application) : AndroidViewModel(application) {
 
     val linuxEngine = LinuxSubsystemEngine()
@@ -33,6 +40,43 @@ class AetherDesktopViewModel(application: Application) : AndroidViewModel(applic
     val prootEngine = PRootUbuntuDistroEngine(application)
     val fileBridge = CrossOsFileBridge()
     val appsManager = InstalledAppsManager(application)
+
+    private val distroInstaller = com.example.engine.DistroInstaller(application)
+    private val _setupState = MutableStateFlow<SetupState>(
+        if (distroInstaller.isInstalled(com.example.engine.Distros.UBUNTU)) SetupState.Done else SetupState.Idle
+    )
+    val setupState: StateFlow<SetupState> = _setupState.asStateFlow()
+
+    fun runSetup() {
+        if (_setupState.value is SetupState.Running || _setupState.value == SetupState.Done) return
+        viewModelScope.launch {
+            var ok = false
+            var attempt = 0
+            while (!ok && attempt < 5) {
+                attempt++
+                ok = distroInstaller.install(com.example.engine.Distros.UBUNTU) { st ->
+                    _setupState.value = when (st) {
+                        is com.example.engine.InstallState.Downloading -> SetupState.Running(
+                            if (st.totalBytes > 0) (st.doneBytes * 100 / st.totalBytes).toInt() else 0,
+                            "Downloading… ${st.doneBytes / 1024} / ${st.totalBytes / 1024} KiB" +
+                                if (attempt > 1) " (attempt $attempt/5)" else ""
+                        )
+                        com.example.engine.InstallState.Verifying -> SetupState.Running(100, "Verifying download…")
+                        com.example.engine.InstallState.Extracting -> SetupState.Running(100, "Installing…")
+                        com.example.engine.InstallState.Installed -> SetupState.Done
+                        is com.example.engine.InstallState.Failed -> SetupState.Failed(st.message)
+                        else -> _setupState.value
+                    }
+                }
+                if (!ok && attempt < 5) {
+                    _setupState.value = SetupState.Running(0, "Retrying (attempt ${attempt + 1}/5)…")
+                    kotlinx.coroutines.delay(2_000L * attempt)
+                }
+            }
+            _setupState.value = if (ok) SetupState.Done
+                else SetupState.Failed("5 attempts failed. Check the network and retry.")
+        }
+    }
     val displayManager = DisplayPresentationManager(application)
 
     private val _activeMode = MutableStateFlow(ActiveMode.HOME_LAUNCHER)

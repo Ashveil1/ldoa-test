@@ -5,6 +5,8 @@ import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import com.example.viewmodel.SetupState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
@@ -47,7 +49,16 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MyApplicationTheme {
-                AetherMainContent(viewModel = viewModel)
+                val setupState by viewModel.setupState.collectAsState()
+                if (setupState != SetupState.Done) {
+                    LaunchedEffect(Unit) { viewModel.runSetup() }
+                    com.example.ui.setup.FirstRunSetupScreen(
+                        state = setupState,
+                        onRetry = { viewModel.runSetup() }
+                    )
+                } else {
+                    AetherMainContent(viewModel = viewModel)
+                }
             }
         }
     }
