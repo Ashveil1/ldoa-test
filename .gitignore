@@ -15,4 +15,4 @@
 .cxx
 local.properties
 .env
-debug.keystore
+# debug.keystore - committed on purpose: fixed CI signing key (debug key, non-secret)
