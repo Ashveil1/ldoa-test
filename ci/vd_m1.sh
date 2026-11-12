@@ -55,29 +55,44 @@ done
 echo "shizuku grant tapped: $TAPPED"
 
 # Wait for the VD to actually be created (poll the service log tag).
-for i in $(seq 1 15); do
-  adb logcat -d -s VdPanel:I VdService:I | grep -q 'virtual display created\|display created id=' && break
+VDSTATE=timeout
+for i in $(seq 1 40); do
+  if adb logcat -d | grep -aq 'createVirtualDisplay failed'; then VDSTATE=failed; break; fi
+  if adb logcat -d | grep -aq 'virtual display created'; then VDSTATE=created; break; fi
+  sleep 3
+done
+echo "vd creation: $VDSTATE"
+sleep 8
+
+# Dismiss any ANR / leftover dialog so the screencap shows the panel,
+# not a "Pixel Launcher isn't responding" cover.
+for i in 1 2 3; do
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  adb pull /sdcard/ui.xml ui.xml >/dev/null 2>&1
+  tap_text 'Wait' || break
   sleep 2
 done
-sleep 8
-adb logcat -d -s VdPanel:I VdService:I VdSmoke:I
+
+adb logcat -d -s VdPanel:I VdService:I VdSmoke:I | tail -30
 adb shell dumpsys display | grep -iB1 -A3 'virtual' || true
 adb logcat -d > full-logcat.txt || true
 
 # Evidence: state transitions from the smoke activity.
 adb logcat -d -s VdSmoke:I > vd-logcat.txt || true
 READY=$(grep -c 'state=READY' vd-logcat.txt || true)
-echo "state=READY lines: $READY"
+VDCREATED=$(adb logcat -d | grep -ac 'virtual display created' || true)
+echo "state=READY lines: $READY, virtual display created lines: $VDCREATED"
 
 # PNG for the artifact + raw RGBA for the assert (ubuntu-24.04 runners
 # have no ImageMagick; raw screencap needs no decoder).
 adb exec-out screencap -p > vd-m1.png
 adb exec-out screencap > vd-m1.raw
 ls -la vd-m1.png vd-m1.raw
-python3 - vd-m1.raw "$READY" <<'PY'
+python3 - vd-m1.raw "$READY" "$VDCREATED" <<'PY'
 import struct, sys
 d = open(sys.argv[1], 'rb').read()
 ready = int(sys.argv[2])
+vdcreated = int(sys.argv[3])
 w, h, fmt = struct.unpack('<III', d[:12])
 px = d[12:]
 n = len(px) // 4
@@ -90,10 +105,10 @@ for i in range(0, n * 4, 4):
         nonblack += 1
 mean = total / (n * 3)
 frac = nonblack / n
-print(f"frame {w}x{h} fmt={fmt} mean={mean:.1f} nonblack={frac*100:.1f}% ready_lines={ready}")
+print(f"frame {w}x{h} fmt={fmt} mean={mean:.1f} nonblack={frac*100:.1f}% ready={ready} vdcreated={vdcreated}")
 # A rendered Settings window is mostly light: demand >=20% non-black so
 # a title-bar-only frame (like the NEED_PERMISSION run, 9%) fails.
-ok = ready > 0 and frac >= 0.20
+ok = ready > 0 and vdcreated > 0 and frac >= 0.20
 print("PASS: VD rendered" if ok else "FAIL: no READY state or black panel")
 sys.exit(0 if ok else 1)
 PY

@@ -41,7 +41,7 @@ fun VdPanel(ctx: Context, backend: VdBackend, component: String, dpi: Int, modif
                     if (id >= 0) {
                         Log.i("VdPanel", "display created id=$id ${w}x$hh")
                         backend.launch(id, component)
-                    } else if (retries++ < 30) {
+                    } else if (retries++ < 150) {
                         Log.i("VdPanel", "createDisplay not ready, retry $retries")
                         sv.postDelayed({ surfaceChanged(h, f, w, hh) }, 1000)
                     } else {
