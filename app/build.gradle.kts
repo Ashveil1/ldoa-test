@@ -48,6 +48,7 @@ android {
       // with the main app; vd-only code and deps live in src/vd / vdImplementation.
       applicationIdSuffix = ".vd"
       versionNameSuffix = "-vd"
+      buildFeatures { aidl = true }
     }
   }
 
@@ -120,6 +121,10 @@ dependencies {
   // LSPosed HiddenApiBypass (Apache 2.0) - the same hidden-API exemption
   // Taskbar applies before requesting freeform windowingMode.
   implementation("org.lsposed.hiddenapibypass:hiddenapibypass:4.3")
+  // vd flavor only: Shizuku API + provider (VirtualDisplay track, see
+  // docs/VDISPLAY_SPEC.md / docs/VDISPLAY_DEPS.md)
+  "vdImplementation"("dev.rikka.shizuku:api:13.1.5")
+  "vdImplementation"("dev.rikka.shizuku:provider:13.1.5")
   implementation(project(":lorie"))
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
