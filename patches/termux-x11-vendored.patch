@@ -1,0 +1,57 @@
+diff --git a/lorie/build.gradle b/lorie/build.gradle
+index 6a0a454..bdd2081 100644
+--- a/lorie/build.gradle
++++ b/lorie/build.gradle
+@@ -24,7 +24,7 @@ def hostApplicationId = hostProject.android.defaultConfig.applicationId ?: hostP
+ android {
+     namespace 'com.termux.x11'
+     //noinspection GrDeprecatedAPIUsage
+-    compileSdkVersion 34
++    compileSdkVersion 35
+     ndkVersion termuxX11NdkVersion
+     defaultConfig {
+         minSdkVersion 24
+diff --git a/lorie/src/main/java/com/termux/x11/CmdEntryPoint.java b/lorie/src/main/java/com/termux/x11/CmdEntryPoint.java
+index 1872369..d306ea2 100644
+--- a/lorie/src/main/java/com/termux/x11/CmdEntryPoint.java
++++ b/lorie/src/main/java/com/termux/x11/CmdEntryPoint.java
+@@ -196,6 +196,9 @@ public class CmdEntryPoint extends ICmdEntryInterface.Stub {
+     private static void initEntryPoint() {
+         ctx = createContext();
+ 
++        String xserverLib = System.getenv("XSERVER_LIB");
++        if (xserverLib != null && !xserverLib.isEmpty()) { System.load(xserverLib); return; }
++
+         String path = "lib/" + (android.os.Process.is64Bit() ? Build.SUPPORTED_64_BIT_ABIS[0] : Build.SUPPORTED_32_BIT_ABIS[0]) + "/libXlorie.so";
+         ClassLoader loader = CmdEntryPoint.class.getClassLoader();
+         URL res = loader != null ? loader.getResource(path) : null;
+diff --git a/lorie/src/main/java/com/termux/x11/LorieApp.java b/lorie/src/main/java/com/termux/x11/LorieApp.java
+index 775026d..3ea2c16 100644
+--- a/lorie/src/main/java/com/termux/x11/LorieApp.java
++++ b/lorie/src/main/java/com/termux/x11/LorieApp.java
+@@ -58,7 +58,11 @@ public class LorieApp extends Application {
+             try {
+                 prefsCtx = createPackageContext(BuildConfig.APPLICATION_ID, 0);
+             } catch (PackageManager.NameNotFoundException e) {
+-                throw new RuntimeException(e);
++                // Host package id can differ from the build-time id (e.g. an
++                // applicationIdSuffix flavor); prefs under the running
++                // package are fine - don't crash the whole app for it.
++                android.util.Log.w("LorieApp", "package context for " + BuildConfig.APPLICATION_ID
++                    + " missing, using own package", e);
+             }
+         }
+ 
+diff --git a/shell-loader/stub/build.gradle b/shell-loader/stub/build.gradle
+index 2f460d5..51e2ba8 100644
+--- a/shell-loader/stub/build.gradle
++++ b/shell-loader/stub/build.gradle
+@@ -2,7 +2,7 @@ apply plugin: 'com.android.library'
+ 
+ android.namespace 'com.termux.x11.stub'
+ android.defaultConfig.minSdkVersion 24
+-android.compileSdkVersion 34
++android.compileSdkVersion 35
+ android.buildFeatures.buildConfig false
+ android.buildTypes.release.minifyEnabled false
+ android.compileOptions.sourceCompatibility JavaVersion.VERSION_1_8
