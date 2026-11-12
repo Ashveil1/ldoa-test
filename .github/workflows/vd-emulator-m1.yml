@@ -35,7 +35,7 @@ jobs:
 
       - name: Install native build tools
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq bison
+          sudo apt-get update -qq && sudo apt-get install -y -qq bison libpulse0  # libpulse0: QEMU on ubuntu-24.04 runners lacks libpulse.so.0
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'ndk;29.0.14206865' 'cmake;3.22.1'
 
       - name: Build vd APK
