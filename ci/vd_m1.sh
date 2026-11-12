@@ -30,21 +30,32 @@ adb shell ps -A | grep -i shizuku || true
 adb shell am start -n com.aistudio.aetherlinux.pxkdmv.vd/com.example.vd.VdSmokeActivity
 sleep 12
 
-# Grant the Shizuku permission dialog if it is showing.
-for i in 1 2 3 4; do
+# Grant the Shizuku permission dialog. Cold-boot emulator races: the
+# dialog can appear late, and a Pixel Launcher ANR ("Wait"/"Close app")
+# can cover it - tap "Wait" to dismiss ANRs, keep polling until the
+# grant has been tapped and is gone (or ~60s elapse).
+tap_text() {
+  local label="$1" B C
+  B=$(grep -o "text=\"$label\"[^>]*bounds=\"[^\"]*\"" ui.xml | grep -o 'bounds="[^"]*"' | head -1)
+  [ -z "$B" ] && return 1
+  C=$(echo "$B" | sed 's/bounds="\[\([0-9]*\),\([0-9]*\)\]\[\([0-9]*\),\([0-9]*\)\]"/echo $(( (\1+\3)\/2 )) $(( (\2+\4)\/2 ))/e')
+  echo "tapping '$label' at $C"
+  adb shell input tap $C
+  return 0
+}
+TAPPED=0
+for i in $(seq 1 20); do
   adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
   adb pull /sdcard/ui.xml ui.xml >/dev/null 2>&1
-  B=$(grep -o 'text="Allow all the time"[^>]*bounds="[^"]*"' ui.xml | grep -o 'bounds="[^"]*"' | head -1)
-  [ -z "$B" ] && B=$(grep -o 'text="Allow"[^>]*bounds="[^"]*"' ui.xml | grep -o 'bounds="[^"]*"' | head -1)
-  [ -z "$B" ] && break
-  C=$(echo "$B" | sed 's/bounds="\[\([0-9]*\),\([0-9]*\)\]\[\([0-9]*\),\([0-9]*\)\]"/echo $(( (\1+\3)\/2 )) $(( (\2+\4)\/2 ))/e')
-  echo "tapping allow at $C"
-  adb shell input tap $C
-  sleep 4
+  if tap_text 'Allow all the time'; then TAPPED=1; sleep 3; continue; fi
+  if tap_text 'Wait'; then sleep 3; continue; fi
+  [ "$TAPPED" = 1 ] && break
+  sleep 3
 done
+echo "shizuku grant tapped: $TAPPED"
 
 # Let the service bind, the display be created and Settings draw.
-sleep 20
+sleep 25
 
 # Evidence: state transitions from the smoke activity.
 adb logcat -d -s VdSmoke:I > vd-logcat.txt || true
