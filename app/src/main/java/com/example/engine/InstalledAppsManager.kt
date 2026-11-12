@@ -20,6 +20,13 @@ import kotlinx.coroutines.launch
 class InstalledAppsManager(private val context: Context) {
     private val TAG = "InstalledApps"
 
+    init {
+        // Lift hidden-API enforcement for this process (LSPosed
+        // HiddenApiBypass, the same exemption Taskbar applies before its
+        // freeform launches). No-op where it fails (e.g. unit tests).
+        runCatching { org.lsposed.hiddenapibypass.HiddenApiBypass.addHiddenApiExemptions("") }
+    }
+
     private val scope = CoroutineScope(Dispatchers.IO)
     private val _androidApps = MutableStateFlow<List<AndroidAppItem>>(emptyList())
     val androidApps: StateFlow<List<AndroidAppItem>> = _androidApps.asStateFlow()
@@ -216,6 +223,18 @@ class InstalledAppsManager(private val context: Context) {
      * already handle the fullscreen fallback honestly.
      */
     private fun requestFreeformWindowingMode(opts: android.app.ActivityOptions): Boolean {
+        // Taskbar's exact path: after HiddenApiBypass, plain reflection.
+        try {
+            val m = android.app.ActivityOptions::class.java.getDeclaredMethod(
+                "setLaunchWindowingMode", Int::class.javaPrimitiveType
+            )
+            m.isAccessible = true
+            m.invoke(opts, 5)
+            return true
+        } catch (t: Throwable) {
+            Log.d(TAG, "direct setLaunchWindowingMode failed, trying meta-reflection: ${t.message}")
+        }
+        // Fallback: meta-reflection (bypasses enforcement without the bypass lib).
         return try {
             val meta = Class::class.java.getDeclaredMethod(
                 "getDeclaredMethod", String::class.java, arrayOfNulls<Class<*>>(0).javaClass

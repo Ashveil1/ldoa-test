@@ -1,5 +1,6 @@
 package com.example
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
@@ -41,6 +42,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Foreground-service process role for floating app launches
+        // (Taskbar parity - see AetherLaunchService).
+        runCatching {
+            startForegroundService(Intent(this, AetherLaunchService::class.java))
+        }
         enableEdgeToEdge()
         window.setFlags(
             android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,

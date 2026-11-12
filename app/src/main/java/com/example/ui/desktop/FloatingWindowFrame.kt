@@ -2,6 +2,8 @@ package com.example.ui.desktop
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
@@ -385,6 +387,7 @@ fun AndroidAppFloatingView(
         modifier = modifier
             .fillMaxSize()
             .background(YaruWindowBody)
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -471,7 +474,7 @@ fun AndroidAppFloatingView(
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Button(
             onClick = { launchResult = appsManager.launchAppFreeform(packageName) },
@@ -493,6 +496,29 @@ fun AndroidAppFloatingView(
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 "On $rom, freeform settings are read at boot: if apps keep opening fullscreen, restart the phone once after enabling floating windows.",
+                color = Color(0xFFAAAAAA), fontSize = 10.sp
+            )
+        }
+        val canOverlay = remember { android.provider.Settings.canDrawOverlays(context) }
+        if (!canOverlay) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = {
+                    context.startActivity(
+                        android.content.Intent(
+                            android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            android.net.Uri.parse("package:${context.packageName}")
+                        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF555555)),
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier.fillMaxWidth().height(38.dp)
+            ) {
+                Text("Allow Display Over Other Apps", color = Color.White, fontSize = 12.sp)
+            }
+            Text(
+                "Taskbar holds this too - some ROMs only float apps launched from a process with overlay + foreground service.",
                 color = Color(0xFFAAAAAA), fontSize = 10.sp
             )
         }

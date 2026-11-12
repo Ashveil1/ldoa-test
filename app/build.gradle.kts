@@ -106,6 +106,9 @@ configurations.all {
 
 dependencies {
   implementation("org.apache.commons:commons-compress:1.27.1")
+  // LSPosed HiddenApiBypass (Apache 2.0) - the same hidden-API exemption
+  // Taskbar applies before requesting freeform windowingMode.
+  implementation("org.lsposed.hiddenapibypass:hiddenapibypass:4.3")
   implementation(project(":lorie"))
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
