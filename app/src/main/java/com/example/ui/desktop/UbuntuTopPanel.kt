@@ -68,8 +68,15 @@ fun UbuntuTopPanel(
     val telemetry by viewModel.telemetry.collectAsState()
     var isQuickSettingsOpen by remember { mutableStateOf(false) }
 
-    val formattedDate = remember {
-        SimpleDateFormat("EEE MMM dd  HH:mm", Locale.US).format(Date())
+    // Ticking top-panel clock: remember{} alone froze it at composition.
+    var formattedDate by remember {
+        mutableStateOf(SimpleDateFormat("EEE MMM dd  HH:mm", Locale.US).format(Date()))
+    }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(30_000)
+            formattedDate = SimpleDateFormat("EEE MMM dd  HH:mm", Locale.US).format(Date())
+        }
     }
 
     Box(modifier = modifier.fillMaxWidth()) {
