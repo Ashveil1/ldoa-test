@@ -138,7 +138,12 @@ class AetherDesktopViewModel(application: Application) : AndroidViewModel(applic
     @Volatile private var measuredFps = 0
 
     private fun startRealTelemetry() {
-        viewModelScope.launch {
+        // Under Robolectric a perpetually re-posted Choreographer callback
+        // keeps composeRule.waitForIdle() from ever settling and hangs the CI
+        // unit-test job; skip ONLY the frame counter there (delay-based
+        // sampling below is historically safe - CI was green with it).
+        val isRobolectric = android.os.Build.FINGERPRINT?.contains("robolectric", ignoreCase = true) == true
+        if (!isRobolectric) viewModelScope.launch {
             val choreographer = android.view.Choreographer.getInstance()
             val callback = object : android.view.Choreographer.FrameCallback {
                 override fun doFrame(frameTimeNanos: Long) {
