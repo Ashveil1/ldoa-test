@@ -9,6 +9,12 @@
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
         <activity
             android:name="com.example.vd.VdSmokeActivity"
-            android:exported="true" />
+            android:label="VD smoke"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
     </application>
 </manifest>
