@@ -41,6 +41,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -76,6 +77,9 @@ fun SmartFileOrganizerView(
     val allFiles by bridge.files.collectAsState()
     val androidFreeGb by bridge.androidStorageFreeGb.collectAsState()
     val linuxFreeGb by bridge.linuxRootfsFreeGb.collectAsState()
+
+    // Real data: scan the rootfs and accessible Android storage on open.
+    LaunchedEffect(Unit) { bridge.refresh() }
 
     var selectedSpace by remember { mutableStateOf<Boolean?>(null) } // null = All, true = Linux, false = Android
     var selectedCategory by remember { mutableStateOf(FileCategory.ALL) }

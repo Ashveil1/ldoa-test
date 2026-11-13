@@ -36,7 +36,7 @@ class AetherDesktopViewModel(application: Application) : AndroidViewModel(applic
 
     val linuxEngine = LinuxSubsystemEngine()
     val prootEngine = PRootUbuntuDistroEngine(application)
-    val fileBridge = CrossOsFileBridge()
+    val fileBridge = CrossOsFileBridge(application) { distroInstaller.rootfsDir(com.example.engine.Distros.UBUNTU) }
     val appsManager = InstalledAppsManager(application)
 
     private val distroInstaller = com.example.engine.DistroInstaller(application)
