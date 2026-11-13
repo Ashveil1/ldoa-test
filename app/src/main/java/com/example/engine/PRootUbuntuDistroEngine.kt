@@ -42,7 +42,9 @@ class PRootUbuntuDistroEngine(private val context: Context) {
     private val distro = Distros.UBUNTU
     private val rootfsDir: File get() = installer.rootfsDir(distro)
     private var session: TerminalSession? = null
-    private var delivered = 0
+    // Absolute scrollback offset (survives front-eviction in TerminalSession;
+    // offsets below session.droppedChars have expired).
+    private var delivered = 0L
 
     private val _terminalOutput = MutableStateFlow<List<String>>(emptyList())
     val terminalOutput: StateFlow<List<String>> = _terminalOutput.asStateFlow()
@@ -135,6 +137,7 @@ class PRootUbuntuDistroEngine(private val context: Context) {
 
     private fun startSession() {
         pendingEcho.clear()
+        delivered = 0L // new session, new scrollback: resync the read offset
         val s = TerminalSession(
             context, rootfsDir,
             fakeRoot = true, // apt/dpkg refuse to run as non-root
@@ -158,9 +161,13 @@ class PRootUbuntuDistroEngine(private val context: Context) {
 
     /** Pull newly-written bytes out of the session scrollback into the UI. */
     private fun drainSessionOutput() {
-        val snap = session?.snapshot() ?: return
-        if (snap.length <= delivered) return
-        val fresh = snap.substring(delivered)
+        val sess = session ?: return
+        val snap = sess.snapshot()
+        // Resync if the capped scrollback evicted content we never delivered.
+        if (delivered < sess.droppedChars) delivered = sess.droppedChars
+        val offset = (delivered - sess.droppedChars).toInt()
+        if (snap.length <= offset) return
+        val fresh = snap.substring(offset)
         // Only consume COMPLETE lines; a chunk can end mid-line and a
         // partial line must not be echo-matched or displayed half-formed.
         val lastNl = fresh.lastIndexOf('\n')
@@ -195,17 +202,32 @@ class PRootUbuntuDistroEngine(private val context: Context) {
             scope.launch { bootRealGuest() }
             return
         }
-        val s = session
+        var s = session
+        if ((s == null || !s.isRunning()) && _ready.value) {
+            // Session died under us (guest crash, OOM kill): restart once
+            // instead of leaving the terminal permanently dead.
+            appendLines(listOf("guest session ended - restarting…"))
+            startSession()
+            s = session
+        }
         if (s == null || !s.isRunning()) {
             appendLines(listOf("guest not ready yet - install/boot still in progress."))
             return
         }
         // cwd goes out-of-band (file, not stdout), so no marker line can
-        // ever leak into the terminal. The shell's echo of both sent lines
-        // is swallowed in drainSessionOutput via pendingEcho.
-        pendingEcho.addLast(cmd)
-        pendingEcho.addLast("pwd > /tmp/.aether_cwd")
-        s.send("$cmd\npwd > /tmp/.aether_cwd")
+        // ever leak into the terminal. The shell's echo of each sent line
+        // is swallowed in drainSessionOutput via pendingEcho. With bash the
+        // shell itself tracks cwd via PROMPT_COMMAND (set in TerminalSession),
+        // so NOTHING extra is written to stdin - interactive programs (apt's
+        // [Y/n], less, editors) used to eat the injected `pwd > ...` line as
+        // their own input. The dash fallback still needs the injected line.
+        cmd.split('\n').forEach { pendingEcho.addLast(it) }
+        if (s.shellTracksCwd) {
+            s.send(cmd)
+        } else {
+            pendingEcho.addLast("pwd > /tmp/.aether_cwd")
+            s.send("$cmd\npwd > /tmp/.aether_cwd")
+        }
     }
 
     private fun refreshPackageState() {

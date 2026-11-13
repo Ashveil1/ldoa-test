@@ -199,7 +199,9 @@ fun FloatingWindowFrame(
                                             androidx.compose.ui.geometry.Offset(
                                                 dragDeltaX.toDp().value,
                                                 dragDeltaY.toDp().value
-                                            )
+                                            ),
+                                            parentWidthDp = parentWidthDp,
+                                            parentHeightDp = parentHeightDp
                                         )
                                     }
                                 }
@@ -297,8 +299,7 @@ fun FloatingWindowFrame(
             ) {
                 when (window.internalAppKey) {
                     "terminal" -> LinuxTerminalView(
-                        prootEngine = viewModel.prootEngine,
-                        realEngine = viewModel.realTerminalEngine
+                        prootEngine = viewModel.prootEngine
                     )
                     "editor" -> CodeStudioView()
                     "office" -> LibreOfficeView()

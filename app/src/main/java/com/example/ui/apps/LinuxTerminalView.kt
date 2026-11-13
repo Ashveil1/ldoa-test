@@ -33,7 +33,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.engine.PRootUbuntuDistroEngine
-import com.example.engine.RealLinuxTerminalEngine
 
 /**
  * Terminal emulator surface: one continuous monochrome console, prompt-led
@@ -42,7 +41,6 @@ import com.example.engine.RealLinuxTerminalEngine
 @Composable
 fun LinuxTerminalView(
     prootEngine: PRootUbuntuDistroEngine,
-    realEngine: RealLinuxTerminalEngine? = null,
     modifier: Modifier = Modifier
 ) {
     val history by prootEngine.terminalOutput.collectAsState()

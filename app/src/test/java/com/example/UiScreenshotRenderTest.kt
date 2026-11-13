@@ -106,7 +106,6 @@ class UiScreenshotRenderTest {
             MyApplicationTheme {
                 LinuxTerminalView(
                     prootEngine = vm.prootEngine,
-                    realEngine = vm.realTerminalEngine,
                     modifier = Modifier.fillMaxSize()
                 )
             }

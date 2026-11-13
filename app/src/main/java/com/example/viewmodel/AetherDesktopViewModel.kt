@@ -11,7 +11,6 @@ import com.example.engine.DisplayPresentationManager
 import com.example.engine.InstalledAppsManager
 import com.example.engine.LinuxSubsystemEngine
 import com.example.engine.PRootUbuntuDistroEngine
-import com.example.engine.RealLinuxTerminalEngine
 import com.example.model.ActiveMode
 import com.example.model.AppType
 import com.example.model.LinuxAppDefinition
@@ -36,7 +35,6 @@ sealed interface SetupState {
 class AetherDesktopViewModel(application: Application) : AndroidViewModel(application) {
 
     val linuxEngine = LinuxSubsystemEngine()
-    val realTerminalEngine = RealLinuxTerminalEngine()
     val prootEngine = PRootUbuntuDistroEngine(application)
     val fileBridge = CrossOsFileBridge()
     val appsManager = InstalledAppsManager(application)
@@ -127,24 +125,69 @@ class AetherDesktopViewModel(application: Application) : AndroidViewModel(applic
     }
 
     init {
-        // Telemetry update interval (tuned to 3s to minimize recomposition overhead)
-        viewModelScope.launch {
-            var counter = 0
-            while (isActive) {
-                delay(3000)
-                counter++
-                val baseFps = if (_gpuTurboBoost.value) 120 else linuxEngine.fpsTarget.value
-                val jitter = (counter % 3) - 1
-                val cpuBase = if (_windows.value.isEmpty()) 8 else 14 + (_windows.value.size * 3)
-                val ramBase = 1250 + (_windows.value.size * 140)
+        startRealTelemetry()
+    }
 
+    // Real UI frame counter: Choreographer fires once per frame our UI
+    // actually renders; idle UI honestly reads 0.
+    private val frameCounter = java.util.concurrent.atomic.AtomicInteger(0)
+    @Volatile private var measuredFps = 0
+
+    private fun startRealTelemetry() {
+        viewModelScope.launch {
+            val choreographer = android.view.Choreographer.getInstance()
+            val callback = object : android.view.Choreographer.FrameCallback {
+                override fun doFrame(frameTimeNanos: Long) {
+                    frameCounter.incrementAndGet()
+                    choreographer.postFrameCallback(this)
+                }
+            }
+            choreographer.postFrameCallback(callback)
+            var lastCount = 0
+            while (isActive) {
+                delay(2000)
+                val now = frameCounter.get()
+                measuredFps = (now - lastCount) / 2
+                lastCount = now
+            }
+        }
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val am = app.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            var prevTotal = -1L
+            var prevIdle = -1L
+            while (isActive) {
+                delay(2000)
+                val mi = android.app.ActivityManager.MemoryInfo()
+                am.getMemoryInfo(mi)
+                val bat = app.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+                val level = bat?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+                val scale = bat?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
+                val pct = if (level >= 0 && scale > 0) level * 100 / scale else 0
+                val tempTenths = bat?.getIntExtra(android.os.BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE) ?: Int.MIN_VALUE
+                val tempC = if (tempTenths != Int.MIN_VALUE) tempTenths / 10f else 0f
+                // CPU: /proc/stat aggregate delta between samples.
+                var cpu = 0
+                runCatching {
+                    val fields = java.io.File("/proc/stat").useLines { it.first() }
+                        .split(Regex("\\s+")).drop(1).mapNotNull { it.toLongOrNull() }
+                    if (fields.size >= 5) {
+                        val idle = fields[3] + fields[4]
+                        val total = fields.sum()
+                        if (prevTotal >= 0 && total > prevTotal) {
+                            cpu = (100.0 * (1.0 - (idle - prevIdle).toDouble() / (total - prevTotal))).toInt().coerceIn(0, 100)
+                        }
+                        prevTotal = total
+                        prevIdle = idle
+                    }
+                }
                 _telemetry.value = SystemTelemetry(
-                    cpuUsagePercent = (cpuBase + (counter % 4)).coerceIn(5, 95),
-                    ramUsedMb = ramBase.coerceIn(800, 7500),
-                    ramTotalMb = 8192,
-                    gpuFps = (baseFps + jitter).coerceIn(30, 144),
-                    batteryPercent = 88,
-                    temperatureCelsius = 35.8f + ((counter % 3) * 0.2f)
+                    cpuUsagePercent = cpu,
+                    ramUsedMb = ((mi.totalMem - mi.availMem) / (1024 * 1024)).toInt(),
+                    ramTotalMb = (mi.totalMem / (1024 * 1024)).toInt(),
+                    gpuFps = measuredFps,
+                    batteryPercent = pct,
+                    temperatureCelsius = tempC
                 )
             }
         }
@@ -336,11 +379,17 @@ class AetherDesktopViewModel(application: Application) : AndroidViewModel(applic
         focusWindow(windowId)
     }
 
-    fun updateWindowPosition(windowId: String, delta: Offset) {
+    fun updateWindowPosition(windowId: String, delta: Offset, parentWidthDp: Float = 0f, parentHeightDp: Float = 0f) {
         _windows.value = _windows.value.map { win ->
             if (win.id == windowId && !win.isMaximized && win.snapState == SnapState.NONE) {
-                val newX = (win.position.x + delta.x).coerceAtLeast(0f)
-                val newY = (win.position.y + delta.y).coerceAtLeast(0f)
+                // Clamp the STORED position to the visible parent too, not only
+                // at render: otherwise a window dragged far past the right/bottom
+                // edge keeps an oversized stored offset and needs an equally long
+                // drag back before it visibly moves ("stuck window" feel).
+                val maxX = if (parentWidthDp > 0f) (parentWidthDp - win.size.width.value).coerceAtLeast(0f) else Float.MAX_VALUE
+                val maxY = if (parentHeightDp > 0f) (parentHeightDp - win.size.height.value).coerceAtLeast(0f) else Float.MAX_VALUE
+                val newX = (win.position.x + delta.x).coerceIn(0f, maxX)
+                val newY = (win.position.y + delta.y).coerceIn(0f, maxY)
                 win.copy(position = Offset(newX, newY))
             } else {
                 win
