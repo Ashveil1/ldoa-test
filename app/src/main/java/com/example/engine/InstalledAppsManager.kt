@@ -116,6 +116,11 @@ class InstalledAppsManager(private val context: Context) {
         }
     }
 
+    /** True when the package has a launchable activity on this device. */
+    fun isInstalled(packageName: String): Boolean = runCatching {
+        context.packageManager.getLaunchIntentForPackage(packageName) != null
+    }.getOrDefault(false)
+
     fun getAppIcon(packageName: String): Bitmap? {
         synchronized(iconCache) {
             if (iconCache.containsKey(packageName)) {

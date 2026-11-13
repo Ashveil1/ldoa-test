@@ -90,7 +90,14 @@ fun AndroidHomeLauncher(
     }
 
     val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-    val now = Date()
+    // Ticking clock: without this the home clock freezes at composition time.
+    var now by remember { mutableStateOf(Date()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(30_000)
+            now = Date()
+        }
+    }
 
     // Authentic apps grid with real brand logos / APK icons
     val homeApps = listOf(
@@ -202,7 +209,10 @@ fun AndroidHomeLauncher(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(homeApps) { app ->
+                // Hide hardcoded Android entries that are not installed on
+                // THIS device (e.g. com.android.camera2 on Xiaomi) instead of
+                // showing a dead icon.
+                items(homeApps.filter { it.isLinux || viewModel.appsManager.isInstalled(it.keyOrPackage) }) { app ->
                     val realIcon = viewModel.appsManager.getAppIcon(app.keyOrPackage)
 
                     Column(
@@ -300,7 +310,13 @@ fun AndroidHomeLauncher(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // Stock Android 5-App Bottom Dock (Real Icons for Phone, Messages, Terminal, Chrome, Camera)
+            // Stock Android 5-App Bottom Dock. Outer slots resolve the first
+            // INSTALLED package per role (AOSP/Google/Xiaomi variants); a role
+            // with no installed app renders nothing instead of a dead icon.
+            val dialerPkg = listOf("com.google.android.dialer", "com.android.dialer", "com.miui.dialer").firstOrNull { viewModel.appsManager.isInstalled(it) }
+            val messagesPkg = listOf("com.google.android.apps.messaging", "com.android.messaging", "com.miui.mms", "com.samsung.android.messaging").firstOrNull { viewModel.appsManager.isInstalled(it) }
+            val browserPkg = listOf("com.android.chrome", "com.mi.globalbrowser", "com.android.browser").firstOrNull { viewModel.appsManager.isInstalled(it) }
+            val cameraPkg = listOf("com.android.camera2", "com.android.camera", "com.miui.camera").firstOrNull { viewModel.appsManager.isInstalled(it) }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -310,23 +326,24 @@ fun AndroidHomeLauncher(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 1. Phone
-                RealAppIcon(
-                    keyOrPackage = "phone",
-                    realBitmap = viewModel.appsManager.getAppIcon("com.google.android.dialer"),
-                    size = 52.dp,
-                    onClick = { viewModel.openAndroidAppSmart("com.google.android.dialer", "Phone") }
-                )
+                if (dialerPkg != null) {
+                    RealAppIcon(
+                        keyOrPackage = "phone",
+                        realBitmap = viewModel.appsManager.getAppIcon(dialerPkg),
+                        size = 52.dp,
+                        onClick = { viewModel.openAndroidAppSmart(dialerPkg, "Phone") }
+                    )
+                }
+                if (messagesPkg != null) {
+                    RealAppIcon(
+                        keyOrPackage = "messages",
+                        realBitmap = viewModel.appsManager.getAppIcon(messagesPkg),
+                        size = 52.dp,
+                        onClick = { viewModel.openAndroidAppSmart(messagesPkg, "Messages") }
+                    )
+                }
 
-                // 2. Messages
-                RealAppIcon(
-                    keyOrPackage = "messages",
-                    realBitmap = viewModel.appsManager.getAppIcon("com.google.android.apps.messaging"),
-                    size = 52.dp,
-                    onClick = { viewModel.openAndroidAppSmart("com.google.android.apps.messaging", "Messages") }
-                )
-
-                // 3. Center: Real Ubuntu Terminal (Floating window)
+                // Center: Real Ubuntu Terminal (Floating window)
                 RealAppIcon(
                     keyOrPackage = "terminal",
                     size = 52.dp,
@@ -335,21 +352,22 @@ fun AndroidHomeLauncher(
                     }
                 )
 
-                // 4. Chrome
-                RealAppIcon(
-                    keyOrPackage = "chrome",
-                    realBitmap = viewModel.appsManager.getAppIcon("com.android.chrome"),
-                    size = 52.dp,
-                    onClick = { viewModel.openAndroidAppSmart("com.android.chrome", "Chrome") }
-                )
-
-                // 5. Camera
-                RealAppIcon(
-                    keyOrPackage = "camera",
-                    realBitmap = viewModel.appsManager.getAppIcon("com.android.camera2"),
-                    size = 52.dp,
-                    onClick = { viewModel.openAndroidAppSmart("com.android.camera2", "Camera") }
-                )
+                if (browserPkg != null) {
+                    RealAppIcon(
+                        keyOrPackage = "browser",
+                        realBitmap = viewModel.appsManager.getAppIcon(browserPkg),
+                        size = 52.dp,
+                        onClick = { viewModel.openAndroidAppSmart(browserPkg, "Browser") }
+                    )
+                }
+                if (cameraPkg != null) {
+                    RealAppIcon(
+                        keyOrPackage = "camera",
+                        realBitmap = viewModel.appsManager.getAppIcon(cameraPkg),
+                        size = 52.dp,
+                        onClick = { viewModel.openAndroidAppSmart(cameraPkg, "Camera") }
+                    )
+                }
             }
         }
 

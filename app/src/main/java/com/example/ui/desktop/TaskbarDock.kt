@@ -90,8 +90,15 @@ fun TaskbarDock(
     val telemetry by viewModel.telemetry.collectAsState()
     val monitorStatus by viewModel.displayManager.monitorStatus.collectAsState()
 
-    val currentTime = remember {
-        SimpleDateFormat("HH:mm", Locale.US).format(Date())
+    // Ticking taskbar clock: remember{} alone froze the time at composition.
+    var currentTime by remember {
+        mutableStateOf(SimpleDateFormat("HH:mm", Locale.US).format(Date()))
+    }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(30_000)
+            currentTime = SimpleDateFormat("HH:mm", Locale.US).format(Date())
+        }
     }
 
     Box(modifier = modifier.fillMaxWidth()) {
