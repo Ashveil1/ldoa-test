@@ -60,9 +60,6 @@ fun UbuntuLeftDock(
         DockItem("terminal", "Ubuntu Terminal", Icons.Default.Terminal, Color(0xFF300A24), Color.White),
         DockItem("files", "Nautilus Files", Icons.Default.Folder, Color(0xFFE95420), Color.White),
         DockItem("editor", "Code Studio", Icons.Default.Code, Color(0xFF007ACC), Color.White),
-        DockItem("office", "LibreOffice Writer", Icons.Default.Description, Color(0xFF18A303), Color.White),
-        DockItem("gimp", "GIMP Paint", Icons.Default.Brush, Color(0xFF5C3566), Color.White),
-        DockItem("browser", "Firefox Browser", Icons.Default.Public, Color(0xFFFF7139), Color.White),
         DockItem("gpu", "GPU Hardware Settings", Icons.Default.Speed, Color(0xFF77216F), Color.White),
         DockItem("android_hub", "Android Bridge Apps", Icons.Default.Android, Color(0xFF34A853), Color.White)
     )

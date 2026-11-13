@@ -71,9 +71,7 @@ import com.example.model.AppType
 import com.example.model.SnapState
 import com.example.model.WindowSession
 import com.example.ui.apps.CodeStudioView
-import com.example.ui.apps.GimpCanvasView
 import com.example.ui.apps.GpuAccelerationPanel
-import com.example.ui.apps.LibreOfficeView
 import com.example.ui.apps.LinuxTerminalView
 import com.example.ui.apps.SmartFileOrganizerView
 import com.example.ui.theme.UbuntuAubergine
@@ -301,9 +299,7 @@ fun FloatingWindowFrame(
                     "terminal" -> LinuxTerminalView(
                         prootEngine = viewModel.prootEngine
                     )
-                    "editor" -> CodeStudioView()
-                    "office" -> LibreOfficeView()
-                    "gimp" -> GimpCanvasView()
+                    "editor" -> CodeStudioView(rootfsDir = viewModel.guestRootfs)
                     "files" -> SmartFileOrganizerView(bridge = viewModel.fileBridge)
                     "gpu" -> GpuAccelerationPanel(
                         engine = viewModel.linuxEngine,
@@ -548,9 +544,7 @@ fun resolveAppIcon(iconName: String, appType: AppType): ImageVector {
         "terminal" -> Icons.Default.Terminal
         "code" -> Icons.Default.Code
         "description" -> Icons.Default.Description
-        "office" -> Icons.Default.Description
         "brush" -> Icons.Default.Brush
-        "gimp" -> Icons.Default.Brush
         "folder" -> Icons.Default.Folder
         "files" -> Icons.Default.Folder
         "speed" -> Icons.Default.Speed

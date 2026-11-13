@@ -43,50 +43,21 @@ class LinuxSubsystemEngine {
         ),
         LinuxAppDefinition(
             id = "editor",
-            name = "Code Studio (VS Code)",
+            name = "Code Studio",
             category = "Development",
-            description = "Full featured desktop IDE with syntax highlighting and file tree",
-            command = "code-server --bind-addr 127.0.0.1:8080",
+            description = "Edit real files in the Ubuntu rootfs and run them in proot",
+            command = "internal-editor",
             iconName = "code"
         ),
-        LinuxAppDefinition(
-            id = "office",
-            name = "LibreOffice Suite",
-            category = "Productivity",
-            description = "Desktop office suite for documents, spreadsheets and presentations",
-            command = "libreoffice --writer",
-            iconName = "description"
-        ),
-        LinuxAppDefinition(
-            id = "gimp",
-            name = "GNU Image Manipulator (GIMP)",
-            category = "Graphics",
-            description = "Touch-adapted digital imaging, photo editing and layers tool",
-            command = "gimp",
-            iconName = "brush"
-        ),
-        LinuxAppDefinition(
-            id = "browser",
-            name = "Chromium / Firefox",
-            category = "Internet",
-            description = "Desktop web browser with tabbed browsing and devtools",
-            command = "firefox -new-tab",
-            iconName = "public"
-        ),
-        LinuxAppDefinition(
-            id = "sysmon",
-            name = "Ubuntu System Monitor",
-            category = "System",
-            description = "Real-time CPU, RAM, GPU, and process inspection",
-            command = "gnome-system-monitor",
-            iconName = "analytics"
-        ),
+        // NOTE: office/gimp/browser/sysmon entries were removed - they opened
+        // placeholder mock windows or dead launches. They come back when the
+        // real X-desktop path can actually run them.
         LinuxAppDefinition(
             id = "files",
-            name = "Nautilus Files",
+            name = "Files (Cross-OS Bridge)",
             category = "Utilities",
-            description = "Linux file explorer with direct Android storage bridge",
-            command = "nautilus /home/ubuntu",
+            description = "Real file explorer over the Ubuntu rootfs and accessible Android storage",
+            command = "internal-files",
             iconName = "folder"
         )
     ))

@@ -104,8 +104,6 @@ fun AndroidHomeLauncher(
         HomeScreenAppEntry("Terminal", "terminal", true, LinuxAppDefinition("terminal", "Terminal (Ubuntu PRoot)", "System", "", "bash", "terminal")),
         HomeScreenAppEntry("Files", "files", true, LinuxAppDefinition("files", "Files", "Utilities", "", "files", "folder")),
         HomeScreenAppEntry("Code", "editor", true, LinuxAppDefinition("editor", "Code Studio", "Development", "", "code", "code")),
-        HomeScreenAppEntry("Office", "office", true, LinuxAppDefinition("office", "LibreOffice", "Productivity", "", "office", "description")),
-        HomeScreenAppEntry("GIMP", "gimp", true, LinuxAppDefinition("gimp", "GIMP Paint", "Graphics", "", "gimp", "brush")),
         HomeScreenAppEntry("Chrome", "com.android.chrome"),
         HomeScreenAppEntry("Photos", "com.google.android.apps.photos"),
         HomeScreenAppEntry("Camera", "com.android.camera2"),

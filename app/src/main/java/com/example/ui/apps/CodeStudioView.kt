@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,8 +17,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -29,20 +28,23 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.engine.Proot
 import com.example.ui.theme.BorderSubtle
-import com.example.ui.theme.ElectricViolet
 import com.example.ui.theme.NeonCyan
 import com.example.ui.theme.ObsidianBg
 import com.example.ui.theme.ObsidianSurface
@@ -51,68 +53,114 @@ import com.example.ui.theme.TerminalAmber
 import com.example.ui.theme.TerminalGreen
 import com.example.ui.theme.TextFrostWhite
 import com.example.ui.theme.TextMuted
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
-data class CodeFile(
-    val name: String,
-    val language: String,
-    val initialContent: String
-)
-
+/**
+ * Real code editor: files live in the installed Ubuntu rootfs at
+ * /home/ubuntu/projects and Run executes them in proot for real
+ * (python3/bash/node when present - a missing interpreter shows the real
+ * guest error, not a canned success banner).
+ */
 @Composable
 fun CodeStudioView(
+    rootfsDir: File,
     modifier: Modifier = Modifier
 ) {
-    val files = remember {
-        listOf(
-            CodeFile(
-                name = "main.py",
-                language = "Python",
-                initialContent = """# AetherLinux Desktop Python Engine
-import os
-import sys
-
-def benchmark_subsystem():
-    print("Ubuntu 24.04 Environment Initialized")
-    print(f"Python Platform: {sys.platform}")
-    print("VirGL Acceleration: ACTIVE (OpenGL ES 3.2)")
-    
-    total = sum([x**2 for x in range(100000)])
-    print(f"Computation benchmark result: {total}")
-
-if __name__ == "__main__":
-    benchmark_subsystem()
-"""
-            ),
-            CodeFile(
-                name = "server.js",
-                language = "Node.js",
-                initialContent = """// Node.js Local Linux Server
-const http = require('http');
-const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'Online', engine: 'AetherOS' }));
-});
-server.listen(3000, () => console.log('Listening on port 3000'));
-"""
-            ),
-            CodeFile(
-                name = "config.yaml",
-                language = "YAML",
-                initialContent = """subsystem:
-  distro: ubuntu-noble
-  gpu_driver: virgl
-  touch_mode: direct_gesture
-  external_monitor: auto_detect
-  display_scaling: 100%
-"""
-            )
-        )
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val workspace = remember(rootfsDir) {
+        File(rootfsDir, "home/ubuntu/projects").apply { mkdirs() }
     }
 
-    var selectedFileIndex by remember { mutableStateOf(0) }
-    var codeContent by remember(selectedFileIndex) { mutableStateOf(files[selectedFileIndex].initialContent) }
+    var fileNames by remember { mutableStateOf<List<String>>(emptyList()) }
+    var selectedFile by remember { mutableStateOf<String?>(null) }
+    var codeContent by remember { mutableStateOf("") }
+    var savedContent by remember { mutableStateOf("") }
     var terminalOutput by remember { mutableStateOf("") }
     var isRunning by remember { mutableStateOf(false) }
+
+    fun refreshFiles(select: String? = null) {
+        // Seed one REAL runnable starter file so a fresh workspace is not
+        // a dead end; it is written to disk and runs in proot like any other.
+        if (workspace.listFiles()?.isEmpty() != false) {
+            File(workspace, "hello.py").writeText(
+                "# Runs for real in the Ubuntu guest via proot\n" +
+                    "import platform, sys\n" +
+                    "print(\"python\", sys.version.split()[0], \"on\", platform.machine())\n" +
+                    "print(\"sum of squares 0..99999:\", sum(x*x for x in range(100000)))\n"
+            )
+        }
+        fileNames = workspace.listFiles()
+            ?.filter { it.isFile }
+            ?.map { it.name }
+            ?.sorted()
+            ?: emptyList()
+        val target = select ?: selectedFile
+        if (target != null && target in fileNames) {
+            selectedFile = target
+        } else {
+            selectedFile = fileNames.firstOrNull()
+        }
+    }
+
+    LaunchedEffect(workspace) { refreshFiles() }
+
+    // Load the selected file's real bytes.
+    LaunchedEffect(selectedFile) {
+        val name = selectedFile ?: return@LaunchedEffect
+        val text = withContext(Dispatchers.IO) {
+            runCatching { File(workspace, name).readText() }.getOrDefault("")
+        }
+        codeContent = text
+        savedContent = text
+    }
+
+    fun saveCurrent() {
+        val name = selectedFile ?: return
+        runCatching { File(workspace, name).writeText(codeContent) }
+        savedContent = codeContent
+    }
+
+    fun runCurrent() {
+        val name = selectedFile ?: return
+        saveCurrent()
+        val interpreter = when (name.substringAfterLast('.', "").lowercase()) {
+            "py" -> "python3"
+            "sh" -> "bash"
+            "js" -> "node"
+            "rb" -> "ruby"
+            else -> null
+        }
+        if (interpreter == null) {
+            terminalOutput = "No interpreter mapping for .$name files - run it from the terminal window instead."
+            return
+        }
+        isRunning = true
+        terminalOutput = "$ $interpreter /home/ubuntu/projects/$name\n"
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    Proot.runGuest(
+                        context, rootfsDir,
+                        listOf(interpreter, "/home/ubuntu/projects/$name"),
+                        fakeRoot = false
+                    )
+                }.getOrElse { Proot.Result(127, "", "host exec failed: ${it.message}", 0) }
+            }
+            terminalOutput = buildString {
+                append("$ $interpreter /home/ubuntu/projects/$name\n")
+                if (result.stdout.isNotBlank()) append(result.stdout.trimEnd()).append('\n')
+                if (result.stderr.isNotBlank()) append(result.stderr.trimEnd()).append('\n')
+                append("[exit ${result.exitCode} in ${result.wallMs} ms]")
+            }
+            isRunning = false
+        }
+    }
+
+    val dirty = codeContent != savedContent
 
     Column(
         modifier = modifier
@@ -136,43 +184,61 @@ server.listen(3000, () => console.log('Listening on port 3000'));
                 modifier = Modifier.padding(end = 12.dp)
             )
 
-            // File Tabs
-            files.forEachIndexed { index, file ->
-                val isSelected = index == selectedFileIndex
-                Box(
-                    modifier = Modifier
-                        .background(
-                            if (isSelected) ObsidianSurfaceVariant else Color.Transparent,
-                            RoundedCornerShape(6.dp)
+            // Real file tabs
+            Row(modifier = Modifier.weight(1f)) {
+                fileNames.take(6).forEach { name ->
+                    val isSelected = name == selectedFile
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                if (isSelected) ObsidianSurfaceVariant else Color.Transparent,
+                                RoundedCornerShape(6.dp)
+                            )
+                            .clickable { if (dirty) saveCurrent(); selectedFile = name }
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = if (isSelected && dirty) "$name *" else name,
+                            color = if (isSelected) NeonCyan else TextMuted,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            fontFamily = FontFamily.Monospace
                         )
-                        .clickable { selectedFileIndex = index }
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = file.name,
-                        color = if (isSelected) NeonCyan else TextMuted,
-                        fontSize = 12.sp,
-                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                        fontFamily = FontFamily.Monospace
-                    )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
                 }
-                Spacer(modifier = Modifier.width(4.dp))
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            // New real file
+            IconButton(
+                onClick = {
+                    var i = 1
+                    while (File(workspace, "untitled$i.py").exists()) i++
+                    val name = "untitled$i.py"
+                    File(workspace, name).writeText("")
+                    refreshFiles(select = name)
+                },
+                modifier = Modifier.size(30.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "New file", tint = TextMuted, modifier = Modifier.size(16.dp))
+            }
+
+            IconButton(
+                onClick = { saveCurrent() },
+                modifier = Modifier.size(30.dp)
+            ) {
+                Icon(
+                    Icons.Default.Save,
+                    contentDescription = "Save",
+                    tint = if (dirty) NeonCyan else TextMuted,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
 
             Button(
-                onClick = {
-                    isRunning = true
-                    terminalOutput = ">>> Running ${files[selectedFileIndex].name} in Ubuntu proot environment...\n" +
-                            "[stdout] Python 3.12.3 executed successfully.\n" +
-                            "[stdout] Ubuntu 24.04 Environment Initialized\n" +
-                            "[stdout] Python Platform: linux-aarch64\n" +
-                            "[stdout] VirGL Acceleration: ACTIVE (OpenGL ES 3.2)\n" +
-                            "[stdout] Computation benchmark result: 333328333350000\n" +
-                            "Process exited with code 0."
-                    isRunning = false
-                },
+                onClick = { if (!isRunning) runCurrent() },
                 colors = ButtonDefaults.buttonColors(containerColor = TerminalGreen),
                 shape = RoundedCornerShape(6.dp),
                 modifier = Modifier
@@ -186,7 +252,12 @@ server.listen(3000, () => console.log('Listening on port 3000'));
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Run", color = ObsidianBg, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    if (isRunning) "Running" else "Run",
+                    color = ObsidianBg,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
 
@@ -196,31 +267,40 @@ server.listen(3000, () => console.log('Listening on port 3000'));
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            TextField(
-                value = codeContent,
-                onValueChange = { codeContent = it },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .testTag("code_editor_field"),
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
-                    color = TextFrostWhite
-                ),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = ObsidianBg,
-                    unfocusedContainerColor = ObsidianBg,
-                    focusedTextColor = TextFrostWhite,
-                    unfocusedTextColor = TextFrostWhite,
-                    cursorColor = NeonCyan,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent
+            if (selectedFile == null) {
+                Text(
+                    "No files in /home/ubuntu/projects yet - tap + to create one.",
+                    color = TextMuted,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(12.dp)
                 )
-            )
+            } else {
+                TextField(
+                    value = codeContent,
+                    onValueChange = { codeContent = it },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("code_editor_field"),
+                    textStyle = androidx.compose.ui.text.TextStyle(
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        color = TextFrostWhite
+                    ),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = ObsidianBg,
+                        unfocusedContainerColor = ObsidianBg,
+                        focusedTextColor = TextFrostWhite,
+                        unfocusedTextColor = TextFrostWhite,
+                        cursorColor = NeonCyan,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    )
+                )
+            }
         }
 
-        // Run Console Output Panel (collapsible/visible when run)
+        // Run Console Output Panel: real guest stdout/stderr/exit
         if (terminalOutput.isNotBlank()) {
             Column(
                 modifier = Modifier
@@ -236,7 +316,7 @@ server.listen(3000, () => console.log('Listening on port 3000'));
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "TERMINAL EXECUTION OUTPUT",
+                        text = "GUEST EXECUTION OUTPUT (real proot)",
                         color = TerminalAmber,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,

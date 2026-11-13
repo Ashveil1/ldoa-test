@@ -37,6 +37,10 @@ class AetherDesktopViewModel(application: Application) : AndroidViewModel(applic
     val linuxEngine = LinuxSubsystemEngine()
     val prootEngine = PRootUbuntuDistroEngine(application)
     val fileBridge = CrossOsFileBridge(application) { distroInstaller.rootfsDir(com.example.engine.Distros.UBUNTU) }
+
+    /** Root of the installed Ubuntu guest (Code Studio edits/runs inside it). */
+    val guestRootfs: java.io.File
+        get() = distroInstaller.rootfsDir(com.example.engine.Distros.UBUNTU)
     val appsManager = InstalledAppsManager(application)
 
     private val distroInstaller = com.example.engine.DistroInstaller(application)
@@ -247,9 +251,6 @@ class AetherDesktopViewModel(application: Application) : AndroidViewModel(applic
         val offsetStep = (_windows.value.size % 4) * 28f
         val defaultSize = when (app.id) {
             "editor" -> DpSize(360.dp, 440.dp)
-            "office" -> DpSize(360.dp, 440.dp)
-            "gimp" -> DpSize(360.dp, 420.dp)
-            "browser" -> DpSize(360.dp, 440.dp)
             "files" -> DpSize(350.dp, 420.dp)
             "gpu" -> DpSize(350.dp, 400.dp)
             else -> DpSize(350.dp, 420.dp)
